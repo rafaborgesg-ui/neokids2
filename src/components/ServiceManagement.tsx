@@ -6,6 +6,7 @@ import { Label } from './ui/label'
 import { Textarea } from './ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog'
 import { Badge } from './ui/badge'
 import { Alert, AlertDescription } from './ui/alert'
 import { 
@@ -18,17 +19,16 @@ import {
   Trash2,
   Loader2
 } from 'lucide-react'
-import { useServices, NewService } from '../hooks/useServices'; // Importar o hook
+import { useServices, NewService, Service } from '../hooks/useServices'; // Importar o hook e o tipo Service
 
 // A interface Service agora vem do hook
 
 interface ServiceManagementProps {
-  accessToken: string; // Não mais necessário para chamadas diretas ao Supabase
   userRole: string;
   onNavigate?: (module: string) => void;
 }
 
-export const ServiceManagement = ({ accessToken, userRole, onNavigate }: ServiceManagementProps) => {
+export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementProps) => {
   // Usar o hook para gerenciar estado e lógica de dados
   const {
     services,
@@ -41,6 +41,7 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
   } = useServices();
 
   const [isNewServiceOpen, setIsNewServiceOpen] = useState(false)
+  const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
   
   // Estado para o formulário de novo serviço
   const [newServiceForm, setNewServiceForm] = useState({
@@ -326,9 +327,25 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
                     <Button variant="ghost" size="sm">
                       <Edit className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => deleteService(service.id)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta ação não pode ser desfeita. Isso irá deletar permanentemente o serviço "{service.name}".
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => deleteService(service.id)}>Deletar</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
 

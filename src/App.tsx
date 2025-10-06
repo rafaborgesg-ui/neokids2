@@ -313,7 +313,6 @@ const App = () => {
         <main className={`flex-1 p-4 md:p-6 ${isMobile ? 'w-full' : ''}`}>
           <div className="max-w-full">
             <ActiveComponent 
-              accessToken={session.access_token} 
               userRole={currentUserRole}
               onNavigate={setActiveModule}
             />

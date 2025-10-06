@@ -4,12 +4,15 @@ import { PostgrestError } from '@supabase/supabase-js';
 import { Patient } from './usePatients';
 import { Service } from './useServices';
 
+// Tipo que reflete o ENUM criado no banco de dados
+export type AppointmentStatus = 'scheduled' | 'awaiting_collection' | 'in_analysis' | 'awaiting_report' | 'completed' | 'canceled' | 'no-show';
+
 // Interface para um agendamento, incluindo dados do paciente e serviços
 export interface Appointment {
   id: string;
   patient_id: string;
   appointment_date: string;
-  status: 'scheduled' | 'completed' | 'canceled' | 'no-show';
+  status: AppointmentStatus;
   notes?: string;
   created_at: string;
   created_by: string;
@@ -22,7 +25,7 @@ export interface Appointment {
 export interface NewAppointmentData {
   p_patient_id: string;
   p_appointment_date: string;
-  p_status: 'scheduled' | 'completed' | 'canceled' | 'no-show';
+  p_status: AppointmentStatus;
   p_notes?: string;
   p_service_ids: string[];
 }
@@ -38,7 +41,7 @@ export const useAppointments = () => {
   };
 
   // Buscar agendamentos (com detalhes de paciente e serviços)
-  const fetchAppointments = useCallback(async (filters: { patientId?: string, date?: string } = {}) => {
+  const fetchAppointments = useCallback(async (filters: { patientId?: string, date?: string, appointmentId?: string } = {}) => {
     setLoading(true);
     setError(null);
 
@@ -55,6 +58,9 @@ export const useAppointments = () => {
 
     if (filters.patientId) {
       query = query.eq('patient_id', filters.patientId);
+    }
+    if (filters.appointmentId) {
+      query = query.eq('id', filters.appointmentId);
     }
     // Adicionar filtro de data se necessário
 
@@ -90,7 +96,7 @@ export const useAppointments = () => {
   }, [fetchAppointments]);
 
   // Atualizar o status de um agendamento
-  const updateAppointmentStatus = useCallback(async (id: string, status: Appointment['status']) => {
+  const updateAppointmentStatus = useCallback(async (id: string, status: AppointmentStatus) => {
     setLoading(true);
     setError(null);
 

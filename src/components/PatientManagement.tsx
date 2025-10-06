@@ -45,19 +45,271 @@ import {
   CheckCircle,
   Loader2,
 } from "lucide-react";
-import { usePatients, Patient, NewPatient } from "../hooks/usePatients"; // Importar o hook e os tipos
+import { usePatients, Patient, NewPatient, UpdatePatient } from "../hooks/usePatients";
 
-// A interface foi movida para usePatients.ts, mas podemos redefinir ou ajustar se necessário.
-// A interface do hook já usa snake_case, então vamos ajustar o componente para usar o mesmo.
+// ====================================================================
+// Componentes de Formulário Estáveis (Definições Corrigidas)
+// ====================================================================
+
+// A interface agora reflete as props diretas que o componente recebe
+interface ValidatedInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'onBlur'> {
+  label: string;
+  error?: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onBlur: (e: React.FocusEvent<HTMLInputElement>) => void;
+}
+
+const ValidatedInput = React.memo(({ label, required, error, ...props }: ValidatedInputProps) => {
+  const hasError = !!error;
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={props.id} className="flex items-center space-x-1">
+        <span>{label}</span>
+        {required && <span className="text-red-500">*</span>}
+      </Label>
+      <div className="relative">
+        <Input
+          className={cn(
+            hasError && "border-red-500 focus:ring-red-500",
+            props.value && !hasError && "border-green-500"
+          )}
+          {...props}
+        />
+        {props.value && !hasError && (
+          <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-green-500" />
+        )}
+      </div>
+      {hasError && (
+        <p className="text-sm text-red-600 flex items-center space-x-1">
+          <AlertTriangle className="w-4 h-4" />
+          <span>{error}</span>
+        </p>
+      )}
+    </div>
+  );
+});
+
+interface ValidatedTextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange' | 'onBlur'> {
+    label: string;
+    error?: string;
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+    onBlur: (e: React.FocusEvent<HTMLTextAreaElement>) => void;
+}
+
+const ValidatedTextarea = React.memo(({ label, required, error, ...props }: ValidatedTextareaProps) => {
+    const hasError = !!error;
+    return (
+        <div className="space-y-2">
+            <Label htmlFor={props.id} className="flex items-center space-x-1">
+                <span>{label}</span>
+                {required && <span className="text-red-500">*</span>}
+            </Label>
+            <div className="relative">
+                <Textarea
+                    className={cn(
+                        hasError && "border-red-500 focus:ring-red-500",
+                        props.value && !hasError && "border-green-500"
+                    )}
+                    {...props}
+                />
+                {props.value && !hasError && (
+                    <CheckCircle className="absolute right-3 top-3 w-4 h-4 text-green-500" />
+                )}
+            </div>
+            {hasError && (
+                <p className="text-sm text-red-600 flex items-center space-x-1">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>{error}</span>
+                </p>
+            )}
+        </div>
+    );
+});
+
+
+// ====================================================================
+// Componente do Formulário (Extraído para Performance)
+// ====================================================================
+interface PatientFormProps {
+  isEditing: boolean;
+  values: Record<string, string>;
+  errors: ValidationErrors;
+  isValid: boolean;
+  patientsLoading: boolean;
+  setValue: (field: string, value: string) => void;
+  handleBlur: (field: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}
+
+const PatientForm = React.memo(({
+  isEditing,
+  values,
+  errors,
+  isValid,
+  patientsLoading,
+  setValue,
+  handleBlur,
+  onSubmit,
+  onCancel,
+}: PatientFormProps) => {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <ValidatedInput
+          id="name"
+          label="Nome Completo"
+          placeholder="Nome do paciente"
+          required
+          value={values.name}
+          onChange={e => setValue("name", e.target.value)}
+          onBlur={() => handleBlur("name")}
+          error={errors.name}
+        />
+        <ValidatedInput
+          id="birthDate"
+          label="Data de Nascimento"
+          type="date"
+          required
+          value={values.birthDate}
+          onChange={e => setValue("birthDate", e.target.value)}
+          onBlur={() => handleBlur("birthDate")}
+          error={errors.birthDate}
+        />
+        <ValidatedInput
+          id="cpf"
+          label="CPF"
+          placeholder="000.000.000-00"
+          required
+          value={values.cpf}
+          onChange={e => setValue("cpf", e.target.value)}
+          onBlur={() => handleBlur("cpf")}
+          error={errors.cpf}
+        />
+        <ValidatedInput
+          id="phone"
+          label="Telefone"
+          placeholder="(11) 99999-9999"
+          required
+          value={values.phone}
+          onChange={e => setValue("phone", e.target.value)}
+          onBlur={() => handleBlur("phone")}
+          error={errors.phone}
+        />
+      </div>
+
+      <ValidatedInput
+        id="email"
+        label="Email"
+        type="email"
+        placeholder="email@exemplo.com"
+        value={values.email}
+        onChange={e => setValue("email", e.target.value)}
+        onBlur={() => handleBlur("email")}
+        error={errors.email}
+      />
+
+      <ValidatedTextarea
+        id="address"
+        label="Endereço Completo"
+        placeholder="Rua, número, bairro, cidade, CEP"
+        required
+        value={values.address}
+        onChange={e => setValue("address", e.target.value)}
+        onBlur={() => handleBlur("address")}
+        error={errors.address}
+      />
+
+      <div className="border-t pt-4">
+        <h4 className="font-medium text-gray-900 mb-4">
+          Dados do Responsável
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <ValidatedInput
+            id="responsibleName"
+            label="Nome do Responsável"
+            placeholder="Nome do responsável"
+            required
+            value={values.responsibleName}
+            onChange={e => setValue("responsibleName", e.target.value)}
+            onBlur={() => handleBlur("responsibleName")}
+            error={errors.responsibleName}
+          />
+          <ValidatedInput
+            id="responsibleCpf"
+            label="CPF do Responsável"
+            placeholder="000.000.000-00"
+            required
+            value={values.responsibleCpf}
+            onChange={e => setValue("responsibleCpf", e.target.value)}
+            onBlur={() => handleBlur("responsibleCpf")}
+            error={errors.responsibleCpf}
+          />
+          <div className="md:col-span-2">
+            <ValidatedInput
+              id="responsiblePhone"
+              label="Telefone do Responsável"
+              placeholder="(11) 99999-9999"
+              required
+              value={values.responsiblePhone}
+              onChange={e => setValue("responsiblePhone", e.target.value)}
+              onBlur={() => handleBlur("responsiblePhone")}
+              error={errors.responsiblePhone}
+            />
+          </div>
+        </div>
+      </div>
+
+      <ValidatedTextarea
+        id="specialAlert"
+        label="Alertas Especiais"
+        placeholder="Alergias, condições especiais, observações importantes..."
+        value={values.specialAlert}
+        onChange={e => setValue("specialAlert", e.target.value)}
+        onBlur={() => handleBlur("specialAlert")}
+        error={errors.specialAlert}
+      />
+
+      <div className="flex justify-end space-x-2 pt-4">
+        <Button
+          variant="outline"
+          onClick={onCancel}
+          disabled={patientsLoading}
+        >
+          Cancelar
+        </Button>
+        <Button
+          onClick={onSubmit}
+          disabled={patientsLoading || !isValid}
+          className="min-w-[120px]"
+        >
+          {patientsLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              {isEditing ? "Salvando..." : "Criando..."}
+            </>
+          ) : (
+            isEditing ? "Salvar Alterações" : "Criar Paciente"
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+});
+
+
+// ====================================================================
+// Componente Principal
+// ====================================================================
 
 interface PatientManagementProps {
-  accessToken: string;
   userRole: string;
   onNavigate?: (module: string) => void;
 }
 
 export const PatientManagement = ({
-  accessToken, // accessToken e userRole podem não ser mais necessários se o RLS cuidar de tudo
   userRole,
   onNavigate,
 }: PatientManagementProps) => {
@@ -68,13 +320,13 @@ export const PatientManagement = ({
     error: patientsError,
     fetchPatients,
     createPatient: createPatientInDb,
+    updatePatient: updatePatientInDb, // Importar a função de update
   } = usePatients();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedPatient, setSelectedPatient] =
-    useState<Patient | null>(null);
-  const [isNewPatientOpen, setIsNewPatientOpen] =
-    useState(false);
+  const [isNewPatientOpen, setIsNewPatientOpen] = useState(false);
+  const [isEditPatientOpen, setIsEditPatientOpen] = useState(false); // Estado para o modal de edição
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null); // Estado para o paciente em edição
 
   // O hook useLoadingStates pode ser simplificado ou substituído pelo 'patientsLoading'
   const { isLoading, withLoading } = useLoadingStates();
@@ -83,12 +335,13 @@ export const PatientManagement = ({
 
   // Form validation for new patient
   const {
-    values: formValues,
-    errors: formErrors,
-    isValid: isFormValid,
-    getFieldProps,
-    resetForm,
+    values,
+    errors,
+    isValid,
+    setValue,
+    handleBlur,
     validateForm,
+    resetForm,
   } = useFormValidation(
     {
       name: "",
@@ -102,18 +355,24 @@ export const PatientManagement = ({
       responsiblePhone: "",
       specialAlert: "",
     },
-    {
-      name: neokidsValidationRules.name,
-      cpf: neokidsValidationRules.cpf,
-      phone: neokidsValidationRules.phone,
-      address: neokidsValidationRules.address,
-      birthDate: neokidsValidationRules.birthDate,
-      email: neokidsValidationRules.email,
-      responsibleName: neokidsValidationRules.name,
-      responsibleCpf: neokidsValidationRules.cpf,
-      responsiblePhone: neokidsValidationRules.phone,
-    },
+    neokidsValidationRules
   );
+
+  // Efeito para preencher o formulário ao abrir o modal de edição
+  useEffect(() => {
+    if (editingPatient) {
+      setValue("name", editingPatient.name);
+      setValue("birthDate", editingPatient.birth_date);
+      setValue("cpf", editingPatient.cpf);
+      setValue("phone", editingPatient.phone);
+      setValue("email", editingPatient.email || "");
+      setValue("address", editingPatient.address);
+      setValue("responsibleName", editingPatient.responsible_name);
+      setValue("responsibleCpf", editingPatient.responsible_cpf);
+      setValue("responsiblePhone", editingPatient.responsible_phone);
+      setValue("specialAlert", editingPatient.special_alert || "");
+    }
+  }, [editingPatient, setValue]);
 
   // Efeito de busca refatorado
   useEffect(() => {
@@ -139,16 +398,16 @@ export const PatientManagement = ({
 
     // Mapear os nomes dos campos do formulário (camelCase) para os nomes das colunas do DB (snake_case)
     const newPatientData: NewPatient = {
-      name: formValues.name,
-      birth_date: formValues.birthDate,
-      cpf: formValues.cpf,
-      phone: formValues.phone,
-      email: formValues.email,
-      address: formValues.address,
-      responsible_name: formValues.responsibleName,
-      responsible_cpf: formValues.responsibleCpf,
-      responsible_phone: formValues.responsiblePhone,
-      special_alert: formValues.specialAlert,
+      name: values.name,
+      birth_date: values.birthDate,
+      cpf: values.cpf,
+      phone: values.phone,
+      email: values.email,
+      address: values.address,
+      responsible_name: values.responsibleName,
+      responsible_cpf: values.responsibleCpf,
+      responsible_phone: values.responsiblePhone,
+      special_alert: values.specialAlert,
     };
 
     const newPatient = await createPatientInDb(newPatientData);
@@ -170,60 +429,68 @@ export const PatientManagement = ({
     }
   };
 
-  // Input component with validation styling
-  const ValidatedInput = ({
-    field,
-    label,
-    type = "text",
-    required = false,
-    placeholder = "",
-    ...props
-  }: {
-    field: string;
-    label: string;
-    type?: string;
-    required?: boolean;
-    placeholder?: string;
-    [key: string]: any;
-  }) => {
-    const fieldProps = getFieldProps(field);
-    const hasError = !!formErrors[field];
+  // Função para ATUALIZAR um paciente
+  const handleUpdatePatient = async () => {
+    if (!editingPatient) return;
 
-    return (
-      <div className="space-y-2">
-        <Label
-          htmlFor={field}
-          className="flex items-center space-x-1"
-        >
-          <span>{label}</span>
-          {required && <span className="text-red-500">*</span>}
-        </Label>
-        <div className="relative">
-          <Input
-            id={field}
-            type={type}
-            placeholder={placeholder}
-            className={cn(
-              hasError && "border-red-500 focus:ring-red-500",
-              fieldProps.value &&
-                !hasError &&
-                "border-green-500",
-            )}
-            {...fieldProps}
-            {...props}
-          />
-          {fieldProps.value && !hasError && (
-            <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-green-500" />
-          )}
-        </div>
-        {hasError && (
-          <p className="text-sm text-red-600 flex items-center space-x-1">
-            <AlertTriangle className="w-4 h-4" />
-            <span>{formErrors[field]}</span>
-          </p>
-        )}
-      </div>
-    );
+    const isValid = await validateForm();
+    if (!isValid) {
+      addToast({
+        type: "error",
+        title: "Erro no formulário",
+        description: "Por favor, corrija os erros no formulário",
+      });
+      return;
+    }
+
+    addToast({
+      type: "info",
+      title: "Atualizando paciente...",
+    });
+
+    const updatedPatientData: UpdatePatient = {
+      name: values.name,
+      birth_date: values.birthDate,
+      cpf: values.cpf,
+      phone: values.phone,
+      email: values.email,
+      address: values.address,
+      responsible_name: values.responsibleName,
+      responsible_cpf: values.responsibleCpf,
+      responsible_phone: values.responsiblePhone,
+      special_alert: values.specialAlert,
+    };
+
+    const updatedPatient = await updatePatientInDb(editingPatient.id, updatedPatientData);
+
+    if (updatedPatient) {
+      setIsEditPatientOpen(false);
+      setEditingPatient(null);
+      resetForm();
+      addToast({
+        type: "success",
+        title: "Paciente atualizado",
+        description: `${updatedPatient.name} foi atualizado com sucesso!`,
+      });
+    } else {
+      addToast({
+        type: "error",
+        title: "Erro ao atualizar paciente",
+        description: patientsError?.message || "Ocorreu um erro. Tente novamente.",
+      });
+    }
+  };
+
+  const handleOpenEditModal = (patient: Patient) => {
+    setEditingPatient(patient);
+    setIsEditPatientOpen(true);
+  };
+
+  const handleCancelForm = () => {
+    setIsNewPatientOpen(false);
+    setIsEditPatientOpen(false);
+    setEditingPatient(null);
+    resetForm();
   };
 
   const calculateAge = (birthDate: string) => {
@@ -286,151 +553,43 @@ export const PatientManagement = ({
                 cadastrá-lo no sistema.
               </DialogDescription>
             </DialogHeader>
-
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ValidatedInput
-                  field="name"
-                  label="Nome Completo"
-                  placeholder="Nome do paciente"
-                  required
-                />
-
-                <ValidatedInput
-                  field="birthDate"
-                  label="Data de Nascimento"
-                  type="date"
-                  required
-                />
-
-                <ValidatedInput
-                  field="cpf"
-                  label="CPF"
-                  placeholder="000.000.000-00"
-                  required
-                />
-
-                <ValidatedInput
-                  field="phone"
-                  label="Telefone"
-                  placeholder="(11) 99999-9999"
-                  required
-                />
-              </div>
-
-              <ValidatedInput
-                field="email"
-                label="Email"
-                type="email"
-                placeholder="email@exemplo.com"
-              />
-
-              <div className="space-y-2">
-                <Label
-                  htmlFor="address"
-                  className="flex items-center space-x-1"
-                >
-                  <span>Endereço Completo</span>
-                  <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <Textarea
-                    id="address"
-                    placeholder="Rua, número, bairro, cidade, CEP"
-                    className={cn(
-                      formErrors.address &&
-                        "border-red-500 focus:ring-red-500",
-                      formValues.address &&
-                        !formErrors.address &&
-                        "border-green-500",
-                    )}
-                    {...getFieldProps("address")}
-                  />
-                  {formValues.address &&
-                    !formErrors.address && (
-                      <CheckCircle className="absolute right-3 top-3 w-4 h-4 text-green-500" />
-                    )}
-                </div>
-                {formErrors.address && (
-                  <p className="text-sm text-red-600 flex items-center space-x-1">
-                    <AlertTriangle className="w-4 h-4" />
-                    <span>{formErrors.address}</span>
-                  </p>
-                )}
-              </div>
-
-              <div className="border-t pt-4">
-                <h4 className="font-medium text-gray-900 mb-4">
-                  Dados do Responsável
-                </h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ValidatedInput
-                    field="responsibleName"
-                    label="Nome do Responsável"
-                    placeholder="Nome do responsável"
-                    required
-                  />
-
-                  <ValidatedInput
-                    field="responsibleCpf"
-                    label="CPF do Responsável"
-                    placeholder="000.000.000-00"
-                    required
-                  />
-
-                  <div className="md:col-span-2">
-                    <ValidatedInput
-                      field="responsiblePhone"
-                      label="Telefone do Responsável"
-                      placeholder="(11) 99999-9999"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="specialAlert">
-                  Alertas Especiais
-                </Label>
-                <Textarea
-                  id="specialAlert"
-                  placeholder="Alergias, condições especiais, observações importantes..."
-                  {...getFieldProps("specialAlert")}
-                />
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setIsNewPatientOpen(false);
-                    resetForm();
-                  }}
-                  disabled={patientsLoading}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleCreatePatient} // Usar a nova função
-                  disabled={patientsLoading || !isFormValid}
-                  className="min-w-[120px]"
-                >
-                  {patientsLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Criando...
-                    </>
-                  ) : (
-                    "Criar Paciente"
-                  )}
-                </Button>
-              </div>
-            </div>
+            <PatientForm 
+              isEditing={false}
+              values={values}
+              errors={errors}
+              isValid={isValid}
+              patientsLoading={patientsLoading}
+              setValue={setValue}
+              handleBlur={field => handleBlur(field)}
+              onSubmit={handleCreatePatient}
+              onCancel={handleCancelForm}
+            />
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Modal de Edição */}
+      <Dialog open={isEditPatientOpen} onOpenChange={setIsEditPatientOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Paciente</DialogTitle>
+            <DialogDescription>
+              Altere os dados do paciente e salve as modificações.
+            </DialogDescription>
+          </DialogHeader>
+          <PatientForm 
+            isEditing={true}
+            values={values}
+            errors={errors}
+            isValid={isValid}
+            patientsLoading={patientsLoading}
+            setValue={setValue}
+            handleBlur={field => handleBlur(field)}
+            onSubmit={handleUpdatePatient}
+            onCancel={handleCancelForm}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Search */}
       <Card>
@@ -566,7 +725,7 @@ export const PatientManagement = ({
                     <Eye className="w-4 h-4 mr-1" />
                     Ver Histórico
                   </Button>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={() => handleOpenEditModal(patient)}>
                     <Edit className="w-4 h-4 mr-1" />
                     Editar
                   </Button>

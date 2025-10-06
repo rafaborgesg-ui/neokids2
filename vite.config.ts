@@ -15,15 +15,21 @@ export default ({ mode }) => {
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, './src'),
+        "@": path.resolve(__dirname, "./src"),
       },
     },
+    publicDir: 'public', // Define explicitamente a pasta public
     build: {
       target: 'esnext',
     },
     server: {
       port: 3000,
       open: true,
+      hmr: {
+        host: 'localhost',
+        protocol: 'ws',
+        clientPort: 3000,
+      },
     },
   });
 };

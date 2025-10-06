@@ -28,12 +28,11 @@ import { useDebounce } from '../hooks/useDebounce';
 // As interfaces Patient e Service agora vêm dos nossos hooks
 
 interface AppointmentFlowProps {
-  accessToken: string; // Não mais necessário
   userRole: string;
   onNavigate?: (module: string) => void;
 }
 
-export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: AppointmentFlowProps) => {
+export const AppointmentFlow = ({ userRole, onNavigate }: AppointmentFlowProps) => {
   // Estado local para controlar o fluxo da UI
   const [currentStep, setCurrentStep] = useState(1)
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
@@ -89,7 +88,7 @@ export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: Appointme
     const appointmentData: NewAppointmentData = {
       p_patient_id: selectedPatient.id,
       p_appointment_date: new Date().toISOString(), // Usar data/hora atual
-      p_status: 'completed', // O fluxo atual finaliza o atendimento
+      p_status: 'awaiting_collection', // Status inicial para o fluxo do laboratório
       p_notes: `Pagamento via ${paymentMethod}. Tipo: ${insuranceType}.`,
       p_service_ids: selectedServices.map(s => s.id),
     };

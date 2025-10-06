@@ -23,6 +23,7 @@ export interface Patient {
 
 // O tipo para um novo paciente não terá id, created_at, etc.
 export type NewPatient = Omit<Patient, 'id' | 'created_at' | 'created_by'>;
+export type UpdatePatient = Partial<NewPatient>;
 
 export const usePatients = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -63,9 +64,22 @@ export const usePatients = () => {
     setLoading(true);
     setError(null);
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      const authError = { message: "Usuário não autenticado.", details: "", hint: "", code: "401" };
+      handleSupabaseError(authError as PostgrestError);
+      setLoading(false);
+      return null;
+    }
+
+    const dataToInsert = {
+      ...patientData,
+      created_by: user.id, // Garante que o criador seja registrado
+    };
+
     const { data, error } = await supabase
       .from('patients')
-      .insert([patientData])
+      .insert([dataToInsert])
       .select();
 
     if (error) {
@@ -83,7 +97,7 @@ export const usePatients = () => {
   }, []);
 
   // Atualizar um paciente
-  const updatePatient = useCallback(async (id: string, updates: Partial<NewPatient>) => {
+  const updatePatient = useCallback(async (id: string, updates: UpdatePatient) => {
     setLoading(true);
     setError(null);
 

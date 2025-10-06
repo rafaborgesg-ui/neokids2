@@ -17,7 +17,7 @@ import {
   Package,
   Settings
 } from 'lucide-react'
-import { projectId, publicAnonKey } from '../utils/supabase/info'
+import { supabase } from '../utils/supabase/client';
 
 interface DashboardStats {
   totalAppointments: number
@@ -28,54 +28,50 @@ interface DashboardStats {
 }
 
 interface DashboardProps {
-  accessToken: string
   userRole: string
   onNavigate?: (module: string) => void
 }
 
-export const Dashboard = ({ accessToken, userRole, onNavigate }: DashboardProps) => {
+export const Dashboard = ({ userRole, onNavigate }: DashboardProps) => {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const { isLoading, withLoading } = useLoadingStates()
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const { addToast } = useToast()
 
   useEffect(() => {
-    fetchStats()
-    
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchStats, 30000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const fetchStats = async () => {
-    try {
-      await withLoading('fetchStats', async () => {
-        const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-f78aeac5/dashboard/stats`,
-          {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`
+    const loadStats = async () => {
+      try {
+        await withLoading('fetchStats', async () => {
+          // Chamada corrigida para a Edge Function com o nome correto e corpo da requisição
+          const { data, error } = await supabase.functions.invoke('api', {
+            body: {
+              path: 'dashboard-stats' // Passando o caminho esperado pela sua função
             }
-          }
-        )
+          });
 
-        if (response.ok) {
-          const data = await response.json()
-          setStats(data)
-          setLastUpdate(new Date())
-        } else {
-          throw new Error('Falha ao carregar dados')
-        }
-      })
-    } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error)
-      addToast({
-        type: 'error',
-        title: 'Erro de conexão',
-        description: 'Verifique sua internet e tente novamente.'
-      })
-    }
-  }
+          if (error) {
+            throw error;
+          }
+
+          setStats(data);
+          setLastUpdate(new Date());
+        });
+      } catch (error: any) {
+        console.error('Erro detalhado ao carregar estatísticas:', error);
+        addToast({
+          type: 'error',
+          title: 'Erro ao Carregar Dashboard',
+          description: error.message || 'Não foi possível buscar os dados do dashboard.',
+        });
+      }
+    };
+
+    loadStats()
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(loadStats, 30000)
+    return () => clearInterval(interval)
+  }, [addToast, withLoading])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
