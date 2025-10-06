@@ -15,43 +15,43 @@ import {
   Clock, 
   FileText,
   Edit,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react'
-import { projectId, publicAnonKey } from '../utils/supabase/info'
+import { useServices, NewService } from '../hooks/useServices'; // Importar o hook
 
-interface Service {
-  id: string
-  name: string
-  category: string
-  code: string
-  basePrice: number
-  operationalCost: number
-  estimatedTime: string
-  instructions: string
-  createdAt: string
-}
+// A interface Service agora vem do hook
 
 interface ServiceManagementProps {
-  accessToken: string
-  userRole: string
-  onNavigate?: (module: string) => void
+  accessToken: string; // Não mais necessário para chamadas diretas ao Supabase
+  userRole: string;
+  onNavigate?: (module: string) => void;
 }
 
 export const ServiceManagement = ({ accessToken, userRole, onNavigate }: ServiceManagementProps) => {
-  const [services, setServices] = useState<Service[]>([])
-  const [isNewServiceOpen, setIsNewServiceOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  // Usar o hook para gerenciar estado e lógica de dados
+  const {
+    services,
+    loading,
+    error,
+    fetchServices,
+    createService,
+    updateService, // Adicionaremos a lógica de update/delete em breve
+    deleteService,
+  } = useServices();
 
-  const [newService, setNewService] = useState({
+  const [isNewServiceOpen, setIsNewServiceOpen] = useState(false)
+  
+  // Estado para o formulário de novo serviço
+  const [newServiceForm, setNewServiceForm] = useState({
     name: '',
     category: '',
     code: '',
-    basePrice: '',
-    operationalCost: '',
-    estimatedTime: '',
+    base_price: '',
+    operational_cost: '',
+    estimated_time: '',
     instructions: ''
-  })
+  });
 
   const categories = [
     'Análises Clínicas',
@@ -62,83 +62,48 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
   ]
 
   useEffect(() => {
-    fetchServices()
-  }, [])
+    fetchServices();
+  }, [fetchServices]);
 
-  const fetchServices = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-f78aeac5/services`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          }
-        }
-      )
+  const handleCreateService = async () => {
+    // Validação simples
+    if (!newServiceForm.name || !newServiceForm.code || !newServiceForm.category || !newServiceForm.base_price) {
+      // Idealmente, usar um sistema de notificação como o useToast
+      alert("Por favor, preencha todos os campos obrigatórios.");
+      return;
+    }
 
-      if (response.ok) {
-        const data = await response.json()
-        setServices(data.services || [])
-      }
-    } catch (error) {
-      console.error('Erro ao carregar serviços:', error)
-      setError('Erro ao carregar serviços')
-    } finally {
-      setLoading(false)
+    const serviceData: NewService = {
+      name: newServiceForm.name,
+      category: newServiceForm.category,
+      code: newServiceForm.code,
+      base_price: parseFloat(newServiceForm.base_price),
+      operational_cost: parseFloat(newServiceForm.operational_cost) || 0,
+      estimated_time: newServiceForm.estimated_time,
+      instructions: newServiceForm.instructions,
+    };
+
+    const newService = await createService(serviceData);
+
+    if (newService) {
+      setIsNewServiceOpen(false);
+      resetNewServiceForm();
+    } else {
+      // Tratar erro (ex: exibir toast)
+      alert("Erro ao criar o serviço.");
     }
   }
 
-  const createService = async () => {
-    setLoading(true)
-    setError('')
-    
-    try {
-      const serviceData = {
-        ...newService,
-        basePrice: parseFloat(newService.basePrice),
-        operationalCost: parseFloat(newService.operationalCost)
-      }
-
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-f78aeac5/services`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`
-          },
-          body: JSON.stringify(serviceData)
-        }
-      )
-
-      if (response.ok) {
-        const data = await response.json()
-        setServices(prev => [data.service, ...prev])
-        setIsNewServiceOpen(false)
-        resetNewService()
-      } else {
-        const errorData = await response.json()
-        setError(errorData.error || 'Erro ao criar serviço')
-      }
-    } catch (error) {
-      console.error('Erro ao criar serviço:', error)
-      setError('Erro ao criar serviço')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const resetNewService = () => {
-    setNewService({
+  const resetNewServiceForm = () => {
+    setNewServiceForm({
       name: '',
       category: '',
       code: '',
-      basePrice: '',
-      operationalCost: '',
-      estimatedTime: '',
+      base_price: '',
+      operational_cost: '',
+      estimated_time: '',
       instructions: ''
-    })
+    });
   }
 
   const formatCurrency = (value: number) => {
@@ -149,7 +114,7 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
   }
 
   const calculateMargin = (basePrice: number, operationalCost: number) => {
-    if (basePrice === 0) return 0
+    if (!basePrice || basePrice === 0) return 0
     return ((basePrice - operationalCost) / basePrice * 100).toFixed(1)
   }
 
@@ -187,7 +152,7 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
             <div className="space-y-6">
               {error && (
                 <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription>{error.message}</AlertDescription>
                 </Alert>
               )}
               
@@ -196,8 +161,8 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
                   <Label htmlFor="name">Nome do Serviço *</Label>
                   <Input
                     id="name"
-                    value={newService.name}
-                    onChange={(e) => setNewService(prev => ({ ...prev, name: e.target.value }))}
+                    value={newServiceForm.name}
+                    onChange={(e) => setNewServiceForm(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Ex: Hemograma Completo"
                     required
                   />
@@ -207,8 +172,8 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
                   <Label htmlFor="code">Código *</Label>
                   <Input
                     id="code"
-                    value={newService.code}
-                    onChange={(e) => setNewService(prev => ({ ...prev, code: e.target.value }))}
+                    value={newServiceForm.code}
+                    onChange={(e) => setNewServiceForm(prev => ({ ...prev, code: e.target.value }))}
                     placeholder="Ex: HG001"
                     required
                   />
@@ -217,8 +182,8 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="category">Categoria *</Label>
                   <Select
-                    value={newService.category}
-                    onValueChange={(value) => setNewService(prev => ({ ...prev, category: value }))}
+                    value={newServiceForm.category}
+                    onValueChange={(value: string) => setNewServiceForm(prev => ({ ...prev, category: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma categoria" />
@@ -239,8 +204,8 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
                     id="basePrice"
                     type="number"
                     step="0.01"
-                    value={newService.basePrice}
-                    onChange={(e) => setNewService(prev => ({ ...prev, basePrice: e.target.value }))}
+                    value={newServiceForm.base_price}
+                    onChange={(e) => setNewServiceForm(prev => ({ ...prev, base_price: e.target.value }))}
                     placeholder="0,00"
                     required
                   />
@@ -252,8 +217,8 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
                     id="operationalCost"
                     type="number"
                     step="0.01"
-                    value={newService.operationalCost}
-                    onChange={(e) => setNewService(prev => ({ ...prev, operationalCost: e.target.value }))}
+                    value={newServiceForm.operational_cost}
+                    onChange={(e) => setNewServiceForm(prev => ({ ...prev, operational_cost: e.target.value }))}
                     placeholder="0,00"
                   />
                 </div>
@@ -262,8 +227,8 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
                   <Label htmlFor="estimatedTime">Tempo Estimado para Resultado</Label>
                   <Input
                     id="estimatedTime"
-                    value={newService.estimatedTime}
-                    onChange={(e) => setNewService(prev => ({ ...prev, estimatedTime: e.target.value }))}
+                    value={newServiceForm.estimated_time}
+                    onChange={(e) => setNewServiceForm(prev => ({ ...prev, estimated_time: e.target.value }))}
                     placeholder="Ex: 2-4 horas, 1 dia útil, 24-48 horas"
                   />
                 </div>
@@ -273,14 +238,14 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
                 <Label htmlFor="instructions">Instruções de Preparo</Label>
                 <Textarea
                   id="instructions"
-                  value={newService.instructions}
-                  onChange={(e) => setNewService(prev => ({ ...prev, instructions: e.target.value }))}
+                  value={newServiceForm.instructions}
+                  onChange={(e) => setNewServiceForm(prev => ({ ...prev, instructions: e.target.value }))}
                   placeholder="Instruções detalhadas para o paciente (jejum, medicações, etc.)"
                   rows={4}
                 />
               </div>
               
-              {newService.basePrice && newService.operationalCost && (
+              {newServiceForm.base_price && newServiceForm.operational_cost && (
                 <Card className="bg-blue-50 border-blue-200">
                   <CardContent className="p-4">
                     <h4 className="font-medium text-blue-900 mb-2">Análise Financeira</h4>
@@ -288,20 +253,20 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
                       <div>
                         <p className="text-blue-700">Margem de Contribuição</p>
                         <p className="font-semibold text-blue-900">
-                          {calculateMargin(parseFloat(newService.basePrice), parseFloat(newService.operationalCost))}%
+                          {calculateMargin(parseFloat(newServiceForm.base_price), parseFloat(newServiceForm.operational_cost))}%
                         </p>
                       </div>
                       <div>
                         <p className="text-blue-700">Lucro por Serviço</p>
                         <p className="font-semibold text-blue-900">
-                          {formatCurrency(parseFloat(newService.basePrice) - parseFloat(newService.operationalCost))}
+                          {formatCurrency(parseFloat(newServiceForm.base_price) - parseFloat(newServiceForm.operational_cost))}
                         </p>
                       </div>
                       <div>
                         <p className="text-blue-700">ROI</p>
                         <p className="font-semibold text-blue-900">
-                          {parseFloat(newService.operationalCost) ? 
-                            ((parseFloat(newService.basePrice) / parseFloat(newService.operationalCost)) * 100).toFixed(0) + '%' : 
+                          {parseFloat(newServiceForm.operational_cost) ? 
+                            ((parseFloat(newServiceForm.base_price) / parseFloat(newServiceForm.operational_cost)) * 100).toFixed(0) + '%' : 
                             'N/A'
                           }
                         </p>
@@ -319,8 +284,13 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
                 >
                   Cancelar
                 </Button>
-                <Button onClick={createService} disabled={loading}>
-                  {loading ? 'Criando...' : 'Criar Serviço'}
+                <Button onClick={handleCreateService} disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Criando...
+                    </>
+                  ) : 'Criar Serviço'}
                 </Button>
               </div>
             </div>
@@ -356,7 +326,7 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
                     <Button variant="ghost" size="sm">
                       <Edit className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                    <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => deleteService(service.id)}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
@@ -369,32 +339,32 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
                       <span className="text-sm text-gray-600">Preço Base</span>
                     </div>
                     <span className="font-semibold text-green-600">
-                      {formatCurrency(service.basePrice)}
+                      {formatCurrency(service.base_price)}
                     </span>
                   </div>
                   
-                  {service.operationalCost > 0 && (
+                  {service.operational_cost > 0 && (
                     <>
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Custo Operacional</span>
                         <span className="text-sm text-red-600">
-                          {formatCurrency(service.operationalCost)}
+                          {formatCurrency(service.operational_cost)}
                         </span>
                       </div>
                       
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Margem</span>
                         <span className="text-sm font-semibold text-blue-600">
-                          {calculateMargin(service.basePrice, service.operationalCost)}%
+                          {calculateMargin(service.base_price, service.operational_cost)}%
                         </span>
                       </div>
                     </>
                   )}
                   
-                  {service.estimatedTime && (
+                  {service.estimated_time && (
                     <div className="flex items-center space-x-2">
                       <Clock className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">{service.estimatedTime}</span>
+                      <span className="text-sm text-gray-600">{service.estimated_time}</span>
                     </div>
                   )}
                   
@@ -410,7 +380,7 @@ export const ServiceManagement = ({ accessToken, userRole, onNavigate }: Service
 
                 <div className="mt-4 pt-4 border-t">
                   <p className="text-xs text-gray-500">
-                    Criado em {new Date(service.createdAt).toLocaleDateString('pt-BR')}
+                    Criado em {new Date(service.created_at).toLocaleDateString('pt-BR')}
                   </p>
                 </div>
               </CardContent>

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
-import { projectId, publicAnonKey } from './utils/supabase/info'
+import { supabase } from './utils/supabase/client' // Importar o cliente centralizado
 import { LoginForm } from './components/LoginForm'
 import { Dashboard } from './components/Dashboard'
 import { PatientManagement } from './components/PatientManagement'
@@ -39,19 +38,14 @@ import {
   Package
 } from 'lucide-react'
 
-const supabase = createClient(
-  `https://${projectId}.supabase.co`,
-  publicAnonKey
-)
-
 type UserSession = {
   access_token: string
   user: {
     id: string
     email: string
     user_metadata: {
-      name: string
-      role: string
+      name?: string
+      role?: string
     }
   }
 }
@@ -219,9 +213,9 @@ const App = () => {
     )
   }
 
-  const userRole = session.user.user_metadata?.role || 'atendente'
+  const currentUserRole = session.user.user_metadata?.role || 'atendente'
   const availableModules = modules.filter(module => 
-    module.roles.includes(userRole)
+    module.roles.includes(currentUserRole)
   )
 
   const ActiveComponent = modules.find(m => m.id === activeModule)?.component || Dashboard
@@ -287,7 +281,7 @@ const App = () => {
                   {session.user.user_metadata?.name || session.user.email}
                 </span>
                 <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                  {userRole}
+                  {currentUserRole}
                 </span>
               </div>
               <Button
@@ -320,7 +314,7 @@ const App = () => {
           <div className="max-w-full">
             <ActiveComponent 
               accessToken={session.access_token} 
-              userRole={userRole}
+              userRole={currentUserRole}
               onNavigate={setActiveModule}
             />
           </div>

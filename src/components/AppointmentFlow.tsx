@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -16,100 +16,58 @@ import {
   QrCode,
   Printer,
   CheckCircle,
-  X
+  X,
+  Loader2
 } from 'lucide-react'
-import { projectId, publicAnonKey } from '../utils/supabase/info'
+// Importar os hooks que criamos
+import { usePatients, Patient } from '../hooks/usePatients';
+import { useServices, Service } from '../hooks/useServices';
+import { useAppointments, NewAppointmentData } from '../hooks/useAppointments';
+import { useDebounce } from '../hooks/useDebounce';
 
-interface Patient {
-  id: string
-  name: string
-  cpf: string
-}
-
-interface Service {
-  id: string
-  name: string
-  code: string
-  basePrice: number
-  category: string
-}
+// As interfaces Patient e Service agora vêm dos nossos hooks
 
 interface AppointmentFlowProps {
-  accessToken: string
-  userRole: string
-  onNavigate?: (module: string) => void
+  accessToken: string; // Não mais necessário
+  userRole: string;
+  onNavigate?: (module: string) => void;
 }
 
 export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: AppointmentFlowProps) => {
+  // Estado local para controlar o fluxo da UI
   const [currentStep, setCurrentStep] = useState(1)
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
-  const [patientSearch, setPatientSearch] = useState('')
-  const [searchResults, setSearchResults] = useState<Patient[]>([])
-  const [services, setServices] = useState<Service[]>([])
+  const [patientSearchQuery, setPatientSearchQuery] = useState('')
   const [selectedServices, setSelectedServices] = useState<Service[]>([])
   const [paymentMethod, setPaymentMethod] = useState('')
   const [insuranceType, setInsuranceType] = useState('particular')
   const [totalAmount, setTotalAmount] = useState(0)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [createdAppointment, setCreatedAppointment] = useState<any>(null)
+  const [createdAppointmentId, setCreatedAppointmentId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchServices()
-  }, [])
+  // Hooks para interagir com o backend
+  const { patients: patientSearchResults, loading: patientsLoading, fetchPatients } = usePatients();
+  const { services, loading: servicesLoading, fetchServices } = useServices();
+  const { appointments, loading: appointmentsLoading, createAppointment, error: appointmentsError } = useAppointments();
 
+  const debouncedPatientSearch = useDebounce(patientSearchQuery, 300);
+
+  // Efeito para buscar serviços quando o componente monta
   useEffect(() => {
-    if (patientSearch.length >= 2) {
-      searchPatients()
-    } else {
-      setSearchResults([])
+    fetchServices();
+  }, [fetchServices]);
+
+  // Efeito para buscar pacientes com base na pesquisa
+  useEffect(() => {
+    if (debouncedPatientSearch.length >= 2) {
+      fetchPatients(debouncedPatientSearch);
     }
-  }, [patientSearch])
+  }, [debouncedPatientSearch, fetchPatients]);
 
+  // Efeito para calcular o valor total quando os serviços selecionados mudam
   useEffect(() => {
-    const total = selectedServices.reduce((sum, service) => sum + service.basePrice, 0)
+    const total = selectedServices.reduce((sum, service) => sum + service.base_price, 0)
     setTotalAmount(total)
   }, [selectedServices])
-
-  const fetchServices = async () => {
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-f78aeac5/services`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          }
-        }
-      )
-
-      if (response.ok) {
-        const data = await response.json()
-        setServices(data.services || [])
-      }
-    } catch (error) {
-      console.error('Erro ao carregar serviços:', error)
-    }
-  }
-
-  const searchPatients = async () => {
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-f78aeac5/patients/search?q=${encodeURIComponent(patientSearch)}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          }
-        }
-      )
-
-      if (response.ok) {
-        const data = await response.json()
-        setSearchResults(data.patients || [])
-      }
-    } catch (error) {
-      console.error('Erro na busca:', error)
-    }
-  }
 
   const addService = (service: Service) => {
     if (!selectedServices.find(s => s.id === service.id)) {
@@ -121,59 +79,40 @@ export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: Appointme
     setSelectedServices(selectedServices.filter(s => s.id !== serviceId))
   }
 
-  const createAppointment = async () => {
-    setLoading(true)
-    setError('')
+  // Função refatorada para criar o agendamento via RPC
+  const handleCreateAppointment = async () => {
+    if (!selectedPatient || selectedServices.length === 0 || !paymentMethod) {
+      // Adicionar um toast de erro aqui
+      return;
+    }
 
-    try {
-      const appointmentData = {
-        patientId: selectedPatient?.id,
-        patientName: selectedPatient?.name,
-        services: selectedServices,
-        totalAmount,
-        paymentMethod,
-        insuranceType
-      }
+    const appointmentData: NewAppointmentData = {
+      p_patient_id: selectedPatient.id,
+      p_appointment_date: new Date().toISOString(), // Usar data/hora atual
+      p_status: 'completed', // O fluxo atual finaliza o atendimento
+      p_notes: `Pagamento via ${paymentMethod}. Tipo: ${insuranceType}.`,
+      p_service_ids: selectedServices.map(s => s.id),
+    };
 
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-f78aeac5/appointments`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`
-          },
-          body: JSON.stringify(appointmentData)
-        }
-      )
+    const newAppointmentId = await createAppointment(appointmentData);
 
-      if (response.ok) {
-        const data = await response.json()
-        setCreatedAppointment(data.appointment)
-        setCurrentStep(4)
-      } else {
-        const errorData = await response.json()
-        setError(errorData.error || 'Erro ao criar atendimento')
-      }
-    } catch (error) {
-      console.error('Erro ao criar atendimento:', error)
-      setError('Erro ao criar atendimento')
-    } finally {
-      setLoading(false)
+    if (newAppointmentId) {
+      setCreatedAppointmentId(newAppointmentId);
+      setCurrentStep(4); // Avançar para a tela de finalização
+    } else {
+      // Tratar erro com um toast
     }
   }
 
   const resetFlow = () => {
     setCurrentStep(1)
     setSelectedPatient(null)
-    setPatientSearch('')
-    setSearchResults([])
+    setPatientSearchQuery('')
     setSelectedServices([])
     setPaymentMethod('')
     setInsuranceType('particular')
     setTotalAmount(0)
-    setError('')
-    setCreatedAppointment(null)
+    setCreatedAppointmentId(null);
   }
 
   const formatCurrency = (value: number) => {
@@ -243,9 +182,9 @@ export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: Appointme
         </CardContent>
       </Card>
 
-      {error && (
+      {appointmentsError && (
         <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{appointmentsError.message}</AlertDescription>
         </Alert>
       )}
 
@@ -264,21 +203,22 @@ export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: Appointme
               <Input
                 className="pl-10"
                 placeholder="Buscar paciente por nome ou CPF..."
-                value={patientSearch}
-                onChange={(e) => setPatientSearch(e.target.value)}
+                value={patientSearchQuery}
+                onChange={(e) => setPatientSearchQuery(e.target.value)}
               />
             </div>
 
-            {searchResults.length > 0 && (
+            {patientsLoading && <Loader2 className="animate-spin mx-auto" />}
+
+            {patientSearchResults.length > 0 && !patientsLoading && (
               <div className="space-y-2 max-h-60 overflow-y-auto">
-                {searchResults.map((patient) => (
+                {patientSearchResults.map((patient) => (
                   <div
                     key={patient.id}
                     className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
                     onClick={() => {
                       setSelectedPatient(patient)
-                      setSearchResults([])
-                      setPatientSearch('')
+                      setPatientSearchQuery('')
                     }}
                   >
                     <div className="flex items-center justify-between">
@@ -336,6 +276,7 @@ export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: Appointme
               <CardTitle>Serviços Disponíveis</CardTitle>
             </CardHeader>
             <CardContent>
+              {servicesLoading && <Loader2 className="animate-spin mx-auto" />}
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {services.map((service) => (
                   <div
@@ -354,7 +295,7 @@ export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: Appointme
                         </div>
                         <p className="font-medium">{service.name}</p>
                         <p className="text-sm text-green-600 font-semibold">
-                          {formatCurrency(service.basePrice)}
+                          {formatCurrency(service.base_price)}
                         </p>
                       </div>
                       <Button
@@ -401,7 +342,7 @@ export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: Appointme
                         <div className="flex-1">
                           <p className="font-medium text-blue-900">{service.name}</p>
                           <p className="text-sm text-blue-700">
-                            {formatCurrency(service.basePrice)}
+                            {formatCurrency(service.base_price)}
                           </p>
                         </div>
                         <Button
@@ -502,10 +443,15 @@ export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: Appointme
                 Voltar
               </Button>
               <Button
-                onClick={createAppointment}
-                disabled={!paymentMethod || loading}
+                onClick={handleCreateAppointment}
+                disabled={!paymentMethod || appointmentsLoading}
               >
-                {loading ? 'Finalizando...' : 'Finalizar Atendimento'}
+                {appointmentsLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Finalizando...
+                  </>
+                ) : 'Finalizar Atendimento'}
               </Button>
             </div>
           </CardContent>
@@ -513,7 +459,7 @@ export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: Appointme
       )}
 
       {/* Step 4: Completion */}
-      {currentStep === 4 && createdAppointment && (
+      {currentStep === 4 && createdAppointmentId && (
         <div className="space-y-6">
           <Card className="bg-green-50 border-green-200">
             <CardContent className="p-6 text-center">
@@ -522,7 +468,7 @@ export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: Appointme
                 Atendimento Criado com Sucesso!
               </h3>
               <p className="text-green-700">
-                ID do Atendimento: <strong>{createdAppointment.id}</strong>
+                ID do Atendimento: <strong>{createdAppointmentId}</strong>
               </p>
             </CardContent>
           </Card>
@@ -534,15 +480,16 @@ export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: Appointme
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {createdAppointment.sampleIds?.map((sampleId: string, index: number) => (
-                    <div key={sampleId} className="p-4 border rounded-lg bg-white">
+                  {/* A lógica de sampleIds precisaria ser implementada no backend se necessário */}
+                  {selectedServices.map((service, index) => (
+                    <div key={service.id} className="p-4 border rounded-lg bg-white">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium">{selectedServices[index]?.name}</p>
-                          <p className="text-sm text-gray-600">Amostra: {sampleId}</p>
+                          <p className="font-medium">{service.name}</p>
+                          <p className="text-sm text-gray-600">Amostra: {createdAppointmentId.substring(0, 8)}-{index + 1}</p>
                         </div>
                         <img
-                          src={generateQRCode(sampleId)}
+                          src={generateQRCode(`${createdAppointmentId}-${index}`)}
                           alt="QR Code"
                           className="w-16 h-16"
                         />
@@ -575,7 +522,7 @@ export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: Appointme
                     </div>
                     <div className="flex justify-between">
                       <span>Atendimento:</span>
-                      <span>{createdAppointment.id}</span>
+                      <span>{createdAppointmentId}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Paciente:</span>
@@ -592,7 +539,7 @@ export const AppointmentFlow = ({ accessToken, userRole, onNavigate }: Appointme
                     {selectedServices.map((service) => (
                       <div key={service.id} className="flex justify-between text-sm">
                         <span>{service.name}</span>
-                        <span>{formatCurrency(service.basePrice)}</span>
+                        <span>{formatCurrency(service.base_price)}</span>
                       </div>
                     ))}
                     <div className="flex justify-between font-semibold pt-2 border-t">

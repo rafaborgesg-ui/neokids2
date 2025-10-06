@@ -230,24 +230,37 @@ export function useFormValidation(
     if (!validateOnChange || !isDirty) return
 
     const validateChangedFields = async () => {
-      const newErrors: ValidationErrors = { ...errors }
-      
+      // Usamos uma função de atualização para evitar a dependência direta de 'errors'
+      setErrors(currentErrors => {
+        const newErrors: ValidationErrors = { ...currentErrors };
+        let hasChanged = false;
+
+        for (const field of Object.keys(validationRules)) {
+          if (debouncedValues[field] !== undefined && touchedFields.has(field)) {
+            // Esta parte precisa ser síncrona dentro do setErrors ou refatorada.
+            // Para uma correção rápida e eficaz, vamos validar e depois setar.
+          }
+        }
+        // A lógica original era assíncrona, o que é complexo dentro de um `setErrors`.
+        // Vamos refatorar para ser mais simples e direto.
+        return currentErrors; // Placeholder
+      });
+
+      // Lógica refatorada para evitar o loop
+      const newErrors: ValidationErrors = {};
       for (const field of Object.keys(validationRules)) {
-        if (debouncedValues[field] !== undefined && touchedFields.has(field)) {
-          const error = await validateField(field)
+        if (touchedFields.has(field)) {
+          const error = await validateField(field);
           if (error) {
-            newErrors[field] = error
-          } else {
-            delete newErrors[field]
+            newErrors[field] = error;
           }
         }
       }
-      
-      setErrors(newErrors)
+      setErrors(newErrors);
     }
 
     validateChangedFields()
-  }, [debouncedValues, validateField, validationRules, validateOnChange, isDirty, touchedFields, errors])
+  }, [debouncedValues, validateField, validationRules, validateOnChange, isDirty, touchedFields]);
 
   const getFieldProps = useCallback((field: string) => {
     const hasError = !!errors[field]
