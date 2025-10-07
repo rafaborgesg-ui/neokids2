@@ -1,5 +1,5 @@
 {
-      "name": "Neokids",
+      "name": "neokids",
       "version": "0.1.0",
       "private": true,
       "dependencies": {
@@ -55,10 +55,12 @@
             "@types/react": "^18.3.3",
             "@types/react-dom": "^18.3.0",
             "@vitejs/plugin-react-swc": "^3.10.2",
-            "vite": "6.3.5"
+            "vite": "6.3.5",
+            "vite-plugin-pwa": "^1.0.3"
       },
       "scripts": {
             "dev": "vite",
-            "build": "vite build"
+            "build": "vite build",
+            "preview": "vite preview"
       }
 }
