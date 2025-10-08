@@ -30,12 +30,28 @@ export const useReports = () => {
     setLoading(true);
     setError(null);
 
-    const { data, error } = await supabase.rpc('get_timeseries_stats', {
-      metric: params.metric,
-      start_date: params.startDate,
-      end_date: params.endDate,
-      time_unit: params.timeUnit,
-    });
+    let rpcName: string;
+    let rpcParams: any;
+
+    // Escolhe a função RPC e os parâmetros com base na métrica
+    if (params.metric === 'appointments') {
+      rpcName = 'get_appointment_volume';
+      rpcParams = {
+        start_date: params.startDate,
+        end_date: params.endDate,
+        time_unit: params.timeUnit,
+      };
+    } else {
+      rpcName = 'get_timeseries_stats';
+      rpcParams = {
+        metric: params.metric,
+        start_date: params.startDate,
+        end_date: params.endDate,
+        time_unit: params.timeUnit,
+      };
+    }
+
+    const { data, error } = await supabase.rpc(rpcName, rpcParams);
 
     if (error) {
       handleSupabaseError(error);

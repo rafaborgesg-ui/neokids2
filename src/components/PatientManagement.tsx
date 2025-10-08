@@ -29,6 +29,7 @@ import { useLoadingStates } from "../hooks/useLoadingStates";
 import {
   useFormValidation,
   neokidsValidationRules,
+  ValidationErrors, // Importar o tipo
 } from "../hooks/useFormValidation";
 import { cn } from "./ui/utils";
 import {
@@ -325,8 +326,8 @@ export const PatientManagement = ({
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isNewPatientOpen, setIsNewPatientOpen] = useState(false);
-  const [isEditPatientOpen, setIsEditPatientOpen] = useState(false); // Estado para o modal de edição
-  const [editingPatient, setEditingPatient] = useState<Patient | null>(null); // Estado para o paciente em edição
+  const [isEditPatientOpen, setIsEditPatientOpen] = useState(false);
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
 
   // O hook useLoadingStates pode ser simplificado ou substituído pelo 'patientsLoading'
   const { isLoading, withLoading } = useLoadingStates();
@@ -357,6 +358,13 @@ export const PatientManagement = ({
     },
     neokidsValidationRules
   );
+
+  // Efeito para limpar o formulário ao abrir o modal de novo paciente
+  useEffect(() => {
+    if (isNewPatientOpen) {
+      resetForm();
+    }
+  }, [isNewPatientOpen, resetForm]);
 
   // Efeito para preencher o formulário ao abrir o modal de edição
   useEffect(() => {

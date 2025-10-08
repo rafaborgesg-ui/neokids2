@@ -40,11 +40,13 @@ export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementPro
     deleteService,
   } = useServices();
 
-  const [isNewServiceOpen, setIsNewServiceOpen] = useState(false)
+  const [isNewServiceOpen, setIsNewServiceOpen] = useState(false);
+  const [isEditServiceOpen, setIsEditServiceOpen] = useState(false); // Estado para o modal de edição
+  const [editingService, setEditingService] = useState<Service | null>(null); // Estado para o serviço em edição
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
   
-  // Estado para o formulário de novo serviço
-  const [newServiceForm, setNewServiceForm] = useState({
+  // Estado para o formulário (usado tanto para criar quanto para editar)
+  const [serviceForm, setServiceForm] = useState({
     name: '',
     category: '',
     code: '',
@@ -66,37 +68,85 @@ export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementPro
     fetchServices();
   }, [fetchServices]);
 
+  // Preenche o formulário quando um serviço é selecionado para edição
+  useEffect(() => {
+    if (editingService) {
+      setServiceForm({
+        name: editingService.name,
+        category: editingService.category,
+        code: editingService.code,
+        base_price: String(editingService.base_price),
+        operational_cost: String(editingService.operational_cost || ''),
+        estimated_time: editingService.estimated_time || '',
+        instructions: editingService.instructions || ''
+      });
+    }
+  }, [editingService]);
+
   const handleCreateService = async () => {
     // Validação simples
-    if (!newServiceForm.name || !newServiceForm.code || !newServiceForm.category || !newServiceForm.base_price) {
-      // Idealmente, usar um sistema de notificação como o useToast
+    if (!serviceForm.name || !serviceForm.code || !serviceForm.category || !serviceForm.base_price) {
       alert("Por favor, preencha todos os campos obrigatórios.");
       return;
     }
 
     const serviceData: NewService = {
-      name: newServiceForm.name,
-      category: newServiceForm.category,
-      code: newServiceForm.code,
-      base_price: parseFloat(newServiceForm.base_price),
-      operational_cost: parseFloat(newServiceForm.operational_cost) || 0,
-      estimated_time: newServiceForm.estimated_time,
-      instructions: newServiceForm.instructions,
+      name: serviceForm.name,
+      category: serviceForm.category,
+      code: serviceForm.code,
+      base_price: parseFloat(serviceForm.base_price),
+      operational_cost: parseFloat(serviceForm.operational_cost) || 0,
+      estimated_time: serviceForm.estimated_time,
+      instructions: serviceForm.instructions,
     };
 
     const newService = await createService(serviceData);
 
     if (newService) {
       setIsNewServiceOpen(false);
-      resetNewServiceForm();
+      resetServiceForm();
     } else {
-      // Tratar erro (ex: exibir toast)
       alert("Erro ao criar o serviço.");
     }
   }
 
-  const resetNewServiceForm = () => {
-    setNewServiceForm({
+  const handleUpdateService = async () => {
+    if (!editingService) return;
+
+    // Validação simples
+    if (!serviceForm.name || !serviceForm.code || !serviceForm.category || !serviceForm.base_price) {
+      alert("Por favor, preencha todos os campos obrigatórios.");
+      return;
+    }
+
+    const updatedData = {
+      name: serviceForm.name,
+      category: serviceForm.category,
+      code: serviceForm.code,
+      base_price: parseFloat(serviceForm.base_price),
+      operational_cost: parseFloat(serviceForm.operational_cost) || 0,
+      estimated_time: serviceForm.estimated_time,
+      instructions: serviceForm.instructions,
+    };
+
+    const updatedService = await updateService(editingService.id, updatedData);
+
+    if (updatedService) {
+      setIsEditServiceOpen(false);
+      setEditingService(null);
+      resetServiceForm();
+    } else {
+      alert("Erro ao atualizar o serviço.");
+    }
+  }
+
+  const openEditModal = (service: Service) => {
+    setEditingService(service);
+    setIsEditServiceOpen(true);
+  };
+
+  const resetServiceForm = () => {
+    setServiceForm({
       name: '',
       category: '',
       code: '',
@@ -130,6 +180,154 @@ export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementPro
     return colors[category] || 'bg-gray-100 text-gray-800'
   }
 
+  const renderForm = (isEditing: boolean) => (
+    <div className="space-y-6">
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error.message}</AlertDescription>
+        </Alert>
+      )}
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="name">Nome do Serviço *</Label>
+          <Input
+            id="name"
+            value={serviceForm.name}
+            onChange={(e) => setServiceForm(prev => ({ ...prev, name: e.target.value }))}
+            placeholder="Ex: Hemograma Completo"
+            required
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="code">Código *</Label>
+          <Input
+            id="code"
+            value={serviceForm.code}
+            onChange={(e) => setServiceForm(prev => ({ ...prev, code: e.target.value }))}
+            placeholder="Ex: HG001"
+            required
+          />
+        </div>
+        
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="category">Categoria *</Label>
+          <Select
+            value={serviceForm.category}
+            onValueChange={(value: string) => setServiceForm(prev => ({ ...prev, category: value }))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione uma categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="basePrice">Preço Base (R$) *</Label>
+          <Input
+            id="basePrice"
+            type="number"
+            step="0.01"
+            value={serviceForm.base_price}
+            onChange={(e) => setServiceForm(prev => ({ ...prev, base_price: e.target.value }))}
+            placeholder="0,00"
+            required
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="operationalCost">Custo Operacional (R$)</Label>
+          <Input
+            id="operationalCost"
+            type="number"
+            step="0.01"
+            value={serviceForm.operational_cost}
+            onChange={(e) => setServiceForm(prev => ({ ...prev, operational_cost: e.target.value }))}
+            placeholder="0,00"
+          />
+        </div>
+        
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="estimatedTime">Tempo Estimado para Resultado</Label>
+          <Input
+            id="estimatedTime"
+            value={serviceForm.estimated_time}
+            onChange={(e) => setServiceForm(prev => ({ ...prev, estimated_time: e.target.value }))}
+            placeholder="Ex: 2-4 horas, 1 dia útil, 24-48 horas"
+          />
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="instructions">Instruções de Preparo</Label>
+        <Textarea
+          id="instructions"
+          value={serviceForm.instructions}
+          onChange={(e) => setServiceForm(prev => ({ ...prev, instructions: e.target.value }))}
+          placeholder="Instruções detalhadas para o paciente (jejum, medicações, etc.)"
+          rows={4}
+        />
+      </div>
+      
+      {serviceForm.base_price && serviceForm.operational_cost && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="p-4">
+            <h4 className="font-medium text-blue-900 mb-2">Análise Financeira</h4>
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="text-blue-700">Margem de Contribuição</p>
+                <p className="font-semibold text-blue-900">
+                  {calculateMargin(parseFloat(serviceForm.base_price), parseFloat(serviceForm.operational_cost))}%
+                </p>
+              </div>
+              <div>
+                <p className="text-blue-700">Lucro por Serviço</p>
+                <p className="font-semibold text-blue-900">
+                  {formatCurrency(parseFloat(serviceForm.base_price) - parseFloat(serviceForm.operational_cost))}
+                </p>
+              </div>
+              <div>
+                <p className="text-blue-700">ROI</p>
+                <p className="font-semibold text-blue-900">
+                  {parseFloat(serviceForm.operational_cost) ? 
+                    ((parseFloat(serviceForm.base_price) / parseFloat(serviceForm.operational_cost)) * 100).toFixed(0) + '%' : 
+                    'N/A'
+                  }
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      <div className="flex justify-end space-x-2 pt-4">
+        <Button 
+          variant="outline" 
+          onClick={() => isEditing ? setIsEditServiceOpen(false) : setIsNewServiceOpen(false)}
+          disabled={loading}
+        >
+          Cancelar
+        </Button>
+        <Button onClick={isEditing ? handleUpdateService : handleCreateService} disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              {isEditing ? 'Salvando...' : 'Criando...'}
+            </>
+          ) : (isEditing ? 'Salvar Alterações' : 'Criar Serviço')}
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -137,7 +335,7 @@ export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementPro
         
         <Dialog open={isNewServiceOpen} onOpenChange={setIsNewServiceOpen}>
           <DialogTrigger asChild>
-            <Button className="flex items-center space-x-2">
+            <Button className="flex items-center space-x-2" onClick={resetServiceForm}>
               <Plus className="w-4 h-4" />
               <span>Novo Serviço</span>
             </Button>
@@ -149,155 +347,23 @@ export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementPro
                 Preencha as informações do novo serviço que será adicionado ao catálogo.
               </DialogDescription>
             </DialogHeader>
-            
-            <div className="space-y-6">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error.message}</AlertDescription>
-                </Alert>
-              )}
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome do Serviço *</Label>
-                  <Input
-                    id="name"
-                    value={newServiceForm.name}
-                    onChange={(e) => setNewServiceForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Ex: Hemograma Completo"
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="code">Código *</Label>
-                  <Input
-                    id="code"
-                    value={newServiceForm.code}
-                    onChange={(e) => setNewServiceForm(prev => ({ ...prev, code: e.target.value }))}
-                    placeholder="Ex: HG001"
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="category">Categoria *</Label>
-                  <Select
-                    value={newServiceForm.category}
-                    onValueChange={(value: string) => setNewServiceForm(prev => ({ ...prev, category: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="basePrice">Preço Base (R$) *</Label>
-                  <Input
-                    id="basePrice"
-                    type="number"
-                    step="0.01"
-                    value={newServiceForm.base_price}
-                    onChange={(e) => setNewServiceForm(prev => ({ ...prev, base_price: e.target.value }))}
-                    placeholder="0,00"
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="operationalCost">Custo Operacional (R$)</Label>
-                  <Input
-                    id="operationalCost"
-                    type="number"
-                    step="0.01"
-                    value={newServiceForm.operational_cost}
-                    onChange={(e) => setNewServiceForm(prev => ({ ...prev, operational_cost: e.target.value }))}
-                    placeholder="0,00"
-                  />
-                </div>
-                
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="estimatedTime">Tempo Estimado para Resultado</Label>
-                  <Input
-                    id="estimatedTime"
-                    value={newServiceForm.estimated_time}
-                    onChange={(e) => setNewServiceForm(prev => ({ ...prev, estimated_time: e.target.value }))}
-                    placeholder="Ex: 2-4 horas, 1 dia útil, 24-48 horas"
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="instructions">Instruções de Preparo</Label>
-                <Textarea
-                  id="instructions"
-                  value={newServiceForm.instructions}
-                  onChange={(e) => setNewServiceForm(prev => ({ ...prev, instructions: e.target.value }))}
-                  placeholder="Instruções detalhadas para o paciente (jejum, medicações, etc.)"
-                  rows={4}
-                />
-              </div>
-              
-              {newServiceForm.base_price && newServiceForm.operational_cost && (
-                <Card className="bg-blue-50 border-blue-200">
-                  <CardContent className="p-4">
-                    <h4 className="font-medium text-blue-900 mb-2">Análise Financeira</h4>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <p className="text-blue-700">Margem de Contribuição</p>
-                        <p className="font-semibold text-blue-900">
-                          {calculateMargin(parseFloat(newServiceForm.base_price), parseFloat(newServiceForm.operational_cost))}%
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-blue-700">Lucro por Serviço</p>
-                        <p className="font-semibold text-blue-900">
-                          {formatCurrency(parseFloat(newServiceForm.base_price) - parseFloat(newServiceForm.operational_cost))}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-blue-700">ROI</p>
-                        <p className="font-semibold text-blue-900">
-                          {parseFloat(newServiceForm.operational_cost) ? 
-                            ((parseFloat(newServiceForm.base_price) / parseFloat(newServiceForm.operational_cost)) * 100).toFixed(0) + '%' : 
-                            'N/A'
-                          }
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsNewServiceOpen(false)}
-                  disabled={loading}
-                >
-                  Cancelar
-                </Button>
-                <Button onClick={handleCreateService} disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Criando...
-                    </>
-                  ) : 'Criar Serviço'}
-                </Button>
-              </div>
-            </div>
+            {renderForm(false)}
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Modal de Edição */}
+      <Dialog open={isEditServiceOpen} onOpenChange={setIsEditServiceOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Serviço</DialogTitle>
+            <DialogDescription>
+              Altere as informações do serviço e salve as modificações.
+            </DialogDescription>
+          </DialogHeader>
+          {renderForm(true)}
+        </DialogContent>
+      </Dialog>
 
       {/* Services Grid */}
       {loading && services.length === 0 ? (
@@ -324,7 +390,7 @@ export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementPro
                   </div>
                   
                   <div className="flex space-x-1">
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => openEditModal(service)}>
                       <Edit className="w-4 h-4" />
                     </Button>
                     <AlertDialog>

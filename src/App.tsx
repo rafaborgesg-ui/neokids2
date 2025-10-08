@@ -21,7 +21,6 @@ import { Button } from './components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from './components/ui/sheet'
 import { ToastProvider } from './components/ui/simple-toast'
 import { useIsMobile } from './hooks/useIsMobile'
-import { InstallPwaPrompt } from './components/InstallPwaPrompt'
 import { 
   User, 
   Users, 
@@ -38,6 +37,95 @@ import {
   Bell,
   Package
 } from 'lucide-react'
+
+// Mover a definição dos módulos para fora do componente
+// Isso evita que o array seja recriado em cada renderização, melhorando a performance.
+const modules = [
+  {
+    id: 'dashboard',
+    name: 'Dashboard',
+    icon: BarChart3,
+    component: Dashboard,
+    roles: ['administrador', 'atendente', 'tecnico']
+  },
+  {
+    id: 'patients',
+    name: 'Pacientes',
+    icon: Users,
+    component: PatientManagement,
+    roles: ['administrador', 'atendente']
+  },
+  {
+    id: 'services',
+    name: 'Serviços',
+    icon: Settings,
+    component: ServiceManagement,
+    roles: ['administrador']
+  },
+  {
+    id: 'appointments',
+    name: 'Atendimentos',
+    icon: Calendar,
+    component: AppointmentFlow,
+    roles: ['administrador', 'atendente']
+  },
+  {
+    id: 'laboratory',
+    name: 'Laboratório',
+    icon: Activity,
+    component: KanbanBoard,
+    roles: ['administrador', 'tecnico', 'atendente']
+  },
+  {
+    id: 'exam-results',
+    name: 'Resultados',
+    icon: FileText,
+    component: ExamResults,
+    roles: ['administrador', 'tecnico', 'atendente']
+  },
+  {
+    id: 'reports',
+    name: 'Relatórios',
+    icon: ClipboardList,
+    component: Reports,
+    roles: ['administrador', 'atendente']
+  },
+  {
+    id: 'print',
+    name: 'Impressão',
+    icon: Printer,
+    component: PrintSystem,
+    roles: ['administrador', 'atendente', 'tecnico']
+  },
+  {
+    id: 'audit',
+    name: 'Auditoria',
+    icon: Shield,
+    component: AuditLog,
+    roles: ['administrador']
+  },
+  {
+    id: 'notifications',
+    name: 'Notificações',
+    icon: Bell,
+    component: NotificationSystem,
+    roles: ['administrador', 'atendente', 'tecnico']
+  },
+  {
+    id: 'inventory',
+    name: 'Estoque',
+    icon: Package,
+    component: InventoryManagement,
+    roles: ['administrador', 'tecnico']
+  },
+  {
+    id: 'settings',
+    name: 'Configurações',
+    icon: Settings,
+    component: SystemSettings,
+    roles: ['administrador']
+  }
+]
 
 type UserSession = {
   access_token: string
@@ -104,93 +192,6 @@ const App = () => {
     setActiveModule('dashboard')
   }
 
-  const modules = [
-    {
-      id: 'dashboard',
-      name: 'Dashboard',
-      icon: BarChart3,
-      component: Dashboard,
-      roles: ['administrador', 'atendente', 'tecnico']
-    },
-    {
-      id: 'patients',
-      name: 'Pacientes',
-      icon: Users,
-      component: PatientManagement,
-      roles: ['administrador', 'atendente']
-    },
-    {
-      id: 'services',
-      name: 'Serviços',
-      icon: Settings,
-      component: ServiceManagement,
-      roles: ['administrador']
-    },
-    {
-      id: 'appointments',
-      name: 'Atendimentos',
-      icon: Calendar,
-      component: AppointmentFlow,
-      roles: ['administrador', 'atendente']
-    },
-    {
-      id: 'laboratory',
-      name: 'Laboratório',
-      icon: Activity,
-      component: KanbanBoard,
-      roles: ['administrador', 'tecnico', 'atendente']
-    },
-    {
-      id: 'exam-results',
-      name: 'Resultados',
-      icon: FileText,
-      component: ExamResults,
-      roles: ['administrador', 'tecnico', 'atendente']
-    },
-    {
-      id: 'reports',
-      name: 'Relatórios',
-      icon: ClipboardList,
-      component: Reports,
-      roles: ['administrador', 'atendente']
-    },
-    {
-      id: 'print',
-      name: 'Impressão',
-      icon: Printer,
-      component: PrintSystem,
-      roles: ['administrador', 'atendente', 'tecnico']
-    },
-    {
-      id: 'audit',
-      name: 'Auditoria',
-      icon: Shield,
-      component: AuditLog,
-      roles: ['administrador']
-    },
-    {
-      id: 'notifications',
-      name: 'Notificações',
-      icon: Bell,
-      component: NotificationSystem,
-      roles: ['administrador', 'atendente', 'tecnico']
-    },
-    {
-      id: 'inventory',
-      name: 'Estoque',
-      icon: Package,
-      component: InventoryManagement,
-      roles: ['administrador', 'tecnico']
-    },
-    {
-      id: 'settings',
-      name: 'Configurações',
-      icon: Settings,
-      component: SystemSettings,
-      roles: ['administrador']
-    }
-  ]
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -225,7 +226,6 @@ const App = () => {
     <ToastProvider>
       <div className="min-h-screen bg-gray-50">
         <NeokidsHead />
-        <InstallPwaPrompt />
       {/* Header */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-40">
         <div className="px-4 sm:px-6 lg:px-8">
@@ -255,7 +255,7 @@ const App = () => {
                 </Sheet>
               )}
               
-              {/* Logo - hidden on mobile when menu is available */}
+              {/* Logo - hidden on mobile quando o menu está disponível */}
               {!isMobile && (
                 <NeokidsLogo 
                   size="lg" 

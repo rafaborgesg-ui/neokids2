@@ -1,21 +1,25 @@
 import { useState, useCallback, useMemo, useRef } from 'react'
 
-export interface ValidationRule {
-  required?: boolean
-  minLength?: number
-  maxLength?: number
-  pattern?: RegExp
-  custom?: (value: string) => string | null
-  message?: string
-}
+// Tipos
+// ====================================================================
 
-export interface ValidationRules {
-  [field: string]: ValidationRule
-}
+// Exportar o tipo para que possa ser usado em outros componentes
+export type ValidationErrors = {
+  [key: string]: string | undefined;
+};
 
-export interface ValidationErrors {
-  [field: string]: string
-}
+type ValidationRule = {
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: RegExp;
+  custom?: (value: string) => string | null;
+  message?: string;
+};
+
+type ValidationRules = {
+  [field: string]: ValidationRule;
+};
 
 export interface UseFormValidationReturn {
   values: Record<string, string>
@@ -27,6 +31,8 @@ export interface UseFormValidationReturn {
   validateForm: () => Promise<boolean>
   resetForm: () => void
 }
+
+// ====================================================================
 
 export function useFormValidation(
   initialValues: Record<string, string> = {},

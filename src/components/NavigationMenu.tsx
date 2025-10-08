@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react'
-import { LucideIcon } from 'lucide-react'
 import { Button } from './ui/button'
 import { cn } from './ui/utils'
 import { NeokidsLogo } from './NeokidsLogo'
 import { IosInstallInstructions } from './IosInstallInstructions'
-import { Download } from 'lucide-react'
+import { Download, type LucideIcon } from 'lucide-react' // Importar o tipo LucideIcon
+import { ScrollArea } from './ui/scroll-area'
 
 interface Module {
   id: string
   name: string
-  icon: LucideIcon
+  icon: LucideIcon // Usar o tipo importado
   roles: string[]
 }
 
@@ -26,37 +26,33 @@ export const NavigationMenu: React.FC<NavigationMenuProps> = ({
   onModuleChange,
   onClose,
 }: NavigationMenuProps) => {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isIos, setIsIos] = useState(false);
-  const [showIosInstructions, setShowIosInstructions] = useState(false);
-  const [canInstall, setCanInstall] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false); // Novo estado para verificar se já está instalado
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [isIos, setIsIos] = useState(false)
+  const [showIosInstructions, setShowIosInstructions] = useState(false)
+  const [canInstall, setCanInstall] = useState(false)
+  const [isStandalone, setIsStandalone] = useState(false)
 
   useEffect(() => {
-    // Verifica se o app já está rodando em modo standalone (instalado)
-    const runningStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    setIsStandalone(runningStandalone);
+    const runningStandalone = window.matchMedia('(display-mode: standalone)').matches
+    setIsStandalone(runningStandalone)
 
-    // Detecta se é iOS
-    const isDeviceIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    setIsIos(isDeviceIos);
+    const isDeviceIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
+    setIsIos(isDeviceIos)
 
-    // Ouve o evento de instalação para navegadores que o suportam (Chrome, Edge, etc.)
     const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      // Só mostra o prompt se o app não estiver instalado
+      e.preventDefault()
       if (!runningStandalone) {
-        setDeferredPrompt(e);
-        setCanInstall(true);
+        setDeferredPrompt(e)
+        setCanInstall(true)
       }
-    };
+    }
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, []);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    }
+  }, [])
 
   const handleInstallClick = () => {
     if (isIos) {
@@ -83,34 +79,45 @@ export const NavigationMenu: React.FC<NavigationMenuProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b">
+    <div className="flex flex-col h-full bg-white">
+      {/* Cabeçalho (não encolhe) */}
+      <div className="p-4 border-b flex-shrink-0">
         <NeokidsLogo size="lg" variant="full" showText={true} />
       </div>
-      <nav className="flex-1 p-4 space-y-2" role="navigation" aria-label="Menu principal">
-        {modules.map((module) => {
-          const Icon = module.icon
-          const isActive = activeModule === module.id
-          return (
-            <Button
-              key={module.id}
-              variant={isActive ? 'secondary' : 'ghost'}
-              className={cn(
-                'w-full justify-start',
-                isActive && 'font-semibold'
-              )}
-              onClick={() => handleModuleClick(module.id)}
-            >
-              <Icon className="w-4 h-4 mr-2" />
-              {module.name}
-            </Button>
-          )
-        })}
-      </nav>
 
-      {/* Botão de Instalação: Só aparece se o app NÃO estiver instalado */}
+      {/* Área de Rolagem (ocupa todo o espaço restante) com efeito de fade */}
+      <div className="flex-grow relative">
+        <ScrollArea className="absolute inset-0">
+          <nav className="p-4 space-y-2">
+            {modules.map(module => {
+              const Icon = module.icon
+              const isActive = activeModule === module.id
+              return (
+                <Button
+                  key={module.id}
+                  variant={isActive ? 'secondary' : 'ghost'}
+                  className={cn(
+                    'w-full justify-start',
+                    isActive && 'font-semibold'
+                  )}
+                  onClick={() => handleModuleClick(module.id)}
+                >
+                  <Icon className="w-4 h-4 mr-2" />
+                  {module.name}
+                </Button>
+              )
+            })}
+          </nav>
+        </ScrollArea>
+        {/* Efeito de fade no topo */}
+        <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-white to-transparent pointer-events-none" />
+        {/* Efeito de fade na base */}
+        <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+      </div>
+
+      {/* Rodapé / Botão de Instalação (não encolhe) */}
       {!isStandalone && (canInstall || isIos) && (
-        <div className="p-4 mt-auto border-t">
+        <div className="p-4 mt-auto border-t flex-shrink-0">
           <Button
             variant="default"
             className="w-full bg-blue-600 hover:bg-blue-700"
@@ -122,7 +129,6 @@ export const NavigationMenu: React.FC<NavigationMenuProps> = ({
         </div>
       )}
 
-      {/* Modal de Instruções para iOS */}
       <IosInstallInstructions
         isOpen={showIosInstructions}
         onClose={() => setShowIosInstructions(false)}
