@@ -90,11 +90,26 @@ export const ExamResults = ({ userRole, onNavigate }: ExamResultsProps) => {
 
     if (saved) {
       setSavingStates(prev => ({ ...prev, [serviceId]: 'saved' }));
-      // Recarrega os dados do atendimento para refletir o resultado salvo
-      fetchAppointments({ appointmentId: selectedAppointment.id });
+      
+      // ATUALIZAÇÃO DA UI: Atualiza o estado local para refletir a mudança
+      setSelectedAppointment(prev => {
+        if (!prev) return null;
+        const newAppointmentServices = prev.appointment_services.map(as => {
+          if (as.services.id === serviceId) {
+            return {
+              ...as,
+              result_data: resultData.result_data,
+              notes: resultData.notes || '', // Garante que o valor seja sempre uma string
+            };
+          }
+          return as;
+        });
+        return { ...prev, appointment_services: newAppointmentServices };
+      });
+
       setTimeout(() => {
         setSavingStates(prev => ({ ...prev, [serviceId]: null }));
-      }, 2000); // Limpa o status de "salvo" após 2 segundos
+      }, 2000);
     } else {
       setSavingStates(prev => ({ ...prev, [serviceId]: null }));
       // Adicionar toast de erro aqui

@@ -80,6 +80,20 @@ export const Dashboard = ({ userRole, onNavigate }: DashboardProps) => {
     }).format(value)
   }
 
+  // Função para traduzir os status para termos amigáveis
+  const translateStatus = (status: string) => {
+    const translations: Record<string, string> = {
+      'awaiting_collection': 'Aguardando Coleta',
+      'in_analysis': 'Em Análise',
+      'awaiting_report': 'Aguardando Laudo',
+      'completed': 'Finalizado',
+      'scheduled': 'Agendado',
+      'canceled': 'Cancelado',
+      'no-show': 'Não Compareceu'
+    };
+    return translations[status] || status;
+  };
+
   const handleQuickAction = (action: string) => {
     if (!onNavigate) return
 
@@ -231,16 +245,19 @@ export const Dashboard = ({ userRole, onNavigate }: DashboardProps) => {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="space-y-3 md:space-y-4">
-              {stats?.statusCounts && Object.entries(stats.statusCounts).map(([status, count]) => (
-                <div key={status} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2 md:space-x-3 min-w-0 flex-1">
-                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[status] || 'bg-gray-100 text-gray-800'} truncate`}>
-                      {status}
+              {stats?.statusCounts && Object.entries(stats.statusCounts).map(([status, count]) => {
+                const translatedStatus = translateStatus(status);
+                return (
+                  <div key={status} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2 md:space-x-3 min-w-0 flex-1">
+                      <div className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[translatedStatus] || 'bg-gray-100 text-gray-800'} truncate`}>
+                        {translatedStatus}
+                      </div>
                     </div>
+                    <span className="font-semibold text-sm md:text-base">{count}</span>
                   </div>
-                  <span className="font-semibold text-sm md:text-base">{count}</span>
-                </div>
-              ))}
+                );
+              })}
               {(!stats?.statusCounts || Object.keys(stats.statusCounts).length === 0) && (
                 <p className="text-gray-500 text-center py-6 md:py-8 text-sm md:text-base">
                   Nenhum atendimento encontrado
@@ -425,7 +442,7 @@ export const Dashboard = ({ userRole, onNavigate }: DashboardProps) => {
               <button 
                 onClick={() => handleQuickAction('configuracoes')}
                 className="p-3 md:p-4 border border-gray-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 active:bg-slate-100 transition-all duration-200 text-left min-h-[60px] md:min-h-[80px] focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 group"
-                title="Configurações do sistema"
+                title="Ir para configurações do sistema"
               >
                 <div className="flex items-center space-x-3">
                   <Settings className="w-5 h-5 md:w-6 md:h-6 text-slate-600 group-hover:text-slate-700 flex-shrink-0 transition-colors" />
