@@ -281,7 +281,7 @@ const App = () => {
           </div>
         </header>
 
-        <div className="flex">
+        <div className="flex"> {/* Esta é a classe que corrige o layout */}
           {/* Desktop Sidebar */}
           {!isMobile && (
             <aside className="w-64 bg-white shadow-sm min-h-[calc(100vh-4rem)] sticky top-16">

@@ -65,14 +65,15 @@ export const useExamResults = () => {
   const upsertResult = useCallback(async (resultData: UpsertExamResult) => {
     setLoading(true);
     setError(null);
+    console.log('[DEBUG] Iniciando upsertResult com:', resultData);
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
+      console.error('[DEBUG] Falha no upsert: Usuário não autenticado.');
       setLoading(false);
       return null;
     }
 
-    // Dados para ambas as tabelas
     const dataToUpsert = {
       ...resultData,
       created_by: user.id,
@@ -80,8 +81,8 @@ export const useExamResults = () => {
       issued_at: new Date().toISOString(),
     };
 
-    // Transação: Salva em ambas as tabelas ao mesmo tempo
-    const [, resultUpsert] = await Promise.all([
+    // Executa as duas operações em paralelo
+    const [updateResponse, upsertResponse] = await Promise.all([
       supabase.from('appointment_services').update({
         result_data: resultData.result_data,
         notes: resultData.notes,
@@ -92,28 +93,31 @@ export const useExamResults = () => {
         .select()
     ]);
 
-    const { data, error } = resultUpsert;
+    console.log('[DEBUG] Resposta do update em appointment_services:', updateResponse);
+    console.log('[DEBUG] Resposta do upsert em exam_results:', upsertResponse);
 
-    if (error) {
-      handleSupabaseError(error);
+    // Verifica se houve erro em QUALQUER uma das operações
+    if (updateResponse.error || upsertResponse.error) {
+      const error = updateResponse.error || upsertResponse.error;
+      handleSupabaseError(error as PostgrestError);
       setLoading(false);
       return null;
-    } else {
-      const upsertedResult = data ? data[0] : null;
-      if (upsertedResult) {
-        setResults(prev => {
-          const index = prev.findIndex(r => r.appointment_id === upsertedResult.appointment_id && r.service_id === upsertedResult.service_id);
-          if (index !== -1) {
-            const newResults = [...prev];
-            newResults[index] = upsertedResult;
-            return newResults;
-          }
-          return [...prev, upsertedResult];
-        });
-      }
-      setLoading(false);
-      return upsertedResult;
     }
+
+    const upsertedResult = upsertResponse.data ? upsertResponse.data[0] : null;
+    if (upsertedResult) {
+      setResults(prev => {
+        const index = prev.findIndex(r => r.appointment_id === upsertedResult.appointment_id && r.service_id === upsertedResult.service_id);
+        if (index !== -1) {
+          const newResults = [...prev];
+          newResults[index] = upsertedResult;
+          return newResults;
+        }
+        return [...prev, upsertedResult];
+      });
+    }
+    setLoading(false);
+    return upsertedResult;
   }, []);
 
   return {

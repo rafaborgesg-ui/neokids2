@@ -4,6 +4,7 @@ import { cn } from './ui/utils';
 import { NeokidsLogo } from './NeokidsLogo';
 import { IosInstallInstructions } from './IosInstallInstructions';
 import { Download, type LucideIcon } from 'lucide-react';
+import { Separator } from './ui/separator';
 
 interface Module {
   id: string
@@ -85,7 +86,7 @@ export const NavigationMenu: React.FC<NavigationMenuProps> = ({
       </div>
 
       {/* Área de Rolagem Nativa (ocupa todo o espaço restante) */}
-      <div className="flex-grow overflow-y-auto">
+      <div className="flex-grow overflow-y-auto hide-scrollbar">
         <nav className="p-4 space-y-2">
           {modules.map(module => {
             const Icon = module.icon;
@@ -105,22 +106,23 @@ export const NavigationMenu: React.FC<NavigationMenuProps> = ({
               </Button>
             );
           })}
+
+          {/* Botão de Instalação DENTRO da área de rolagem */}
+          {!isStandalone && (isIos || canInstall) && (
+            <>
+              <Separator className="my-4" />
+              <Button
+                variant="default"
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                onClick={handleInstallClick}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Instalar APP
+              </Button>
+            </>
+          )}
         </nav>
       </div>
-
-      {/* Rodapé / Botão de Instalação (não encolhe) */}
-      {!isStandalone && (canInstall || isIos) && (
-        <div className="p-4 mt-auto border-t flex-shrink-0">
-          <Button
-            variant="default"
-            className="w-full bg-blue-600 hover:bg-blue-700"
-            onClick={handleInstallClick}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Instalar APP
-          </Button>
-        </div>
-      )}
 
       {/* Modal de Instruções para iOS */}
       <IosInstallInstructions
