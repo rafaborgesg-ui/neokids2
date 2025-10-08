@@ -1,14 +1,77 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { Badge } from './ui/badge';
-import { useInventory, NewInventoryItem, InventoryItem } from '../hooks/useInventory';
-import { Loader2, Package, Plus, Edit, Trash2, Shield } from 'lucide-react';
+import { useInventory, NewInventoryItem, InventoryItem, UpdateInventoryItem } from '../hooks/useInventory';
+import { Loader2, Package, Plus, Edit, Trash2, Shield, ArrowLeft } from 'lucide-react';
+import { useIsMobile } from '../hooks/useIsMobile';
+
+// Componente de Formulário reutilizável
+const InventoryForm = ({ item, onSave, onCancel, loading }: { item: Partial<InventoryItem>, onSave: (data: any) => void, onCancel: () => void, loading: boolean }) => {
+  const [formData, setFormData] = useState(item);
+
+  useEffect(() => {
+    setFormData(item);
+  }, [item]);
+
+  const handleChange = (field: string, value: any) => {
+    // Garante que campos numéricos sejam tratados corretamente
+    if (field === 'quantity' || field === 'alert_level') {
+      const numValue = parseInt(value, 10);
+      setFormData(prev => ({ ...prev, [field]: isNaN(numValue) ? 0 : numValue }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="name">Nome do Item *</Label>
+          <Input id="name" value={formData.name || ''} onChange={e => handleChange('name', e.target.value)} required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="quantity">Quantidade *</Label>
+          <Input id="quantity" type="number" value={formData.quantity || 0} onChange={e => handleChange('quantity', e.target.value)} required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="unit">Unidade</Label>
+          <Input id="unit" value={formData.unit || ''} onChange={e => handleChange('unit', e.target.value)} placeholder="Ex: unidades, caixas" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="alert_level">Nível de Alerta *</Label>
+          <Input id="alert_level" type="number" value={formData.alert_level || 10} onChange={e => handleChange('alert_level', e.target.value)} required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="supplier">Fornecedor</Label>
+          <Input id="supplier" value={formData.supplier || ''} onChange={e => handleChange('supplier', e.target.value)} />
+        </div>
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="description">Descrição</Label>
+          <Textarea id="description" value={formData.description || ''} onChange={e => handleChange('description', e.target.value)} />
+        </div>
+      </div>
+      <div className="flex justify-end space-x-2 pt-4">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>Cancelar</Button>
+        <Button type="submit" disabled={loading}>
+          {loading ? <Loader2 className="animate-spin" /> : 'Salvar'}
+        </Button>
+      </div>
+    </form>
+  );
+};
+
 
 interface InventoryManagementProps {
   userRole: string;
@@ -17,32 +80,33 @@ interface InventoryManagementProps {
 
 export const InventoryManagement = ({ userRole }: InventoryManagementProps) => {
   const { items, loading, fetchItems, createItem, updateItem, deleteItem } = useInventory();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [view, setView] = useState<'list' | 'new' | 'edit'>('list');
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
-  const [formData, setFormData] = useState<Partial<NewInventoryItem>>({});
 
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
 
-  const handleOpenDialog = (item: InventoryItem | null = null) => {
-    setEditingItem(item);
-    setFormData(item ? { ...item } : { name: '', quantity: 0, low_stock_threshold: 10, unit: 'unidades' });
-    setIsDialogOpen(true);
-  };
-
-  const handleSave = async () => {
-    if (!formData.name) return; // Simple validation
-
-    if (editingItem) {
-      await updateItem(editingItem.id, formData);
+  const handleSave = async (data: any) => {
+    console.log('[DEBUG] Tentando salvar dados do item:', data); // Log dos dados do formulário
+    if (view === 'edit' && editingItem) {
+      const { id, created_at, ...updateData } = data;
+      await updateItem(editingItem.id, updateData as UpdateInventoryItem);
     } else {
-      await createItem(formData as NewInventoryItem);
+      await createItem(data as NewInventoryItem);
     }
-    setIsDialogOpen(false);
+    setView('list');
   };
 
-  const isLowStock = (item: InventoryItem) => item.quantity <= item.low_stock_threshold;
+  const handleEdit = (item: InventoryItem) => {
+    setEditingItem(item);
+    setView('edit');
+  };
+
+  const handleNew = () => {
+    setEditingItem(null);
+    setView('new');
+  };
 
   if (userRole !== 'administrador' && userRole !== 'tecnico') {
     return (
@@ -54,11 +118,37 @@ export const InventoryManagement = ({ userRole }: InventoryManagementProps) => {
     );
   }
 
+  if (view === 'new' || view === 'edit') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Button variant="ghost" size="sm" onClick={() => setView('list')} className="mr-2">
+              <ArrowLeft />
+            </Button>
+            {view === 'new' ? 'Novo Item de Estoque' : 'Editar Item'}
+          </CardTitle>
+          <CardDescription>
+            {view === 'new' ? 'Preencha os detalhes do novo item.' : 'Atualize os detalhes do item.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <InventoryForm 
+            item={editingItem || { name: '', quantity: 0, alert_level: 10, unit: 'unidades' }}
+            onSave={handleSave}
+            onCancel={() => setView('list')}
+            loading={loading}
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-semibold text-gray-900">Gerenciamento de Estoque</h2>
-        <Button onClick={() => handleOpenDialog()}>
+        <Button onClick={handleNew}>
           <Plus className="w-4 h-4 mr-2" />
           Novo Item
         </Button>
@@ -75,7 +165,7 @@ export const InventoryManagement = ({ userRole }: InventoryManagementProps) => {
                   <TableHead>Item</TableHead>
                   <TableHead>Quantidade</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Ações</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -84,14 +174,14 @@ export const InventoryManagement = ({ userRole }: InventoryManagementProps) => {
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell>{item.quantity} {item.unit}</TableCell>
                     <TableCell>
-                      {isLowStock(item) ? (
+                      {item.quantity <= item.alert_level ? (
                         <Badge variant="destructive">Estoque Baixo</Badge>
                       ) : (
                         <Badge variant="default">Em Estoque</Badge>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(item)}><Edit className="w-4 h-4" /></Button>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}><Edit className="w-4 h-4" /></Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="sm" className="text-red-500"><Trash2 className="w-4 h-4" /></Button>
@@ -117,40 +207,6 @@ export const InventoryManagement = ({ userRole }: InventoryManagementProps) => {
           )}
         </CardContent>
       </Card>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingItem ? 'Editar Item' : 'Novo Item de Estoque'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome do Item</Label>
-              <Input id="name" value={formData.name || ''} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantidade</Label>
-                <Input id="quantity" type="number" value={formData.quantity || 0} onChange={e => setFormData(p => ({ ...p, quantity: parseInt(e.target.value) }))} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="unit">Unidade</Label>
-                <Input id="unit" value={formData.unit || ''} onChange={e => setFormData(p => ({ ...p, unit: e.target.value }))} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="low_stock_threshold">Alerta de Estoque Baixo</Label>
-              <Input id="low_stock_threshold" type="number" value={formData.low_stock_threshold || 0} onChange={e => setFormData(p => ({ ...p, low_stock_threshold: parseInt(e.target.value) }))} />
-            </div>
-          </div>
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={loading}>
-              {loading ? <Loader2 className="animate-spin" /> : 'Salvar'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

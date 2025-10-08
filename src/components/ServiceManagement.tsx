@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card' // Adicionar CardDescription
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -19,7 +19,8 @@ import {
   Trash2,
   Loader2
 } from 'lucide-react'
-import { useServices, NewService, Service } from '../hooks/useServices'; // Importar o hook e o tipo Service
+import { useServices, NewService, Service } from '../hooks/useServices';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 // A interface Service agora vem do hook
 
@@ -29,7 +30,7 @@ interface ServiceManagementProps {
 }
 
 export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementProps) => {
-  // Usar o hook para gerenciar estado e lógica de dados
+  const [view, setView] = useState<'list' | 'new' | 'edit'>('list'); // Estado para controlar a visualização
   const {
     services,
     loading,
@@ -41,8 +42,8 @@ export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementPro
   } = useServices();
 
   const [isNewServiceOpen, setIsNewServiceOpen] = useState(false);
-  const [isEditServiceOpen, setIsEditServiceOpen] = useState(false); // Estado para o modal de edição
-  const [editingService, setEditingService] = useState<Service | null>(null); // Estado para o serviço em edição
+  const [isEditServiceOpen, setIsEditServiceOpen] = useState(false);
+  const [editingService, setEditingService] = useState<Service | null>(null);
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
   
   // Estado para o formulário (usado tanto para criar quanto para editar)
@@ -70,7 +71,7 @@ export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementPro
 
   // Preenche o formulário quando um serviço é selecionado para edição
   useEffect(() => {
-    if (editingService) {
+    if (view === 'edit' && editingService) {
       setServiceForm({
         name: editingService.name,
         category: editingService.category,
@@ -81,7 +82,7 @@ export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementPro
         instructions: editingService.instructions || ''
       });
     }
-  }, [editingService]);
+  }, [view, editingService]);
 
   const handleCreateService = async () => {
     // Validação simples
@@ -103,7 +104,7 @@ export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementPro
     const newService = await createService(serviceData);
 
     if (newService) {
-      setIsNewServiceOpen(false);
+      setView('list'); // Retorna para a lista após criar
       resetServiceForm();
     } else {
       alert("Erro ao criar o serviço.");
@@ -132,7 +133,7 @@ export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementPro
     const updatedService = await updateService(editingService.id, updatedData);
 
     if (updatedService) {
-      setIsEditServiceOpen(false);
+      setView('list'); // Retorna para a lista após editar
       setEditingService(null);
       resetServiceForm();
     } else {
@@ -142,7 +143,13 @@ export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementPro
 
   const openEditModal = (service: Service) => {
     setEditingService(service);
-    setIsEditServiceOpen(true);
+    setView('edit');
+  };
+
+  const handleCancelForm = () => {
+    setView('list');
+    setEditingService(null);
+    resetServiceForm();
   };
 
   const resetServiceForm = () => {
@@ -311,7 +318,7 @@ export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementPro
       <div className="flex justify-end space-x-2 pt-4">
         <Button 
           variant="outline" 
-          onClick={() => isEditing ? setIsEditServiceOpen(false) : setIsNewServiceOpen(false)}
+          onClick={handleCancelForm}
           disabled={loading}
         >
           Cancelar
@@ -328,42 +335,32 @@ export const ServiceManagement = ({ userRole, onNavigate }: ServiceManagementPro
     </div>
   );
 
+  if (view === 'new' || view === 'edit') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{view === 'new' ? 'Cadastrar Novo Serviço' : 'Editar Serviço'}</CardTitle>
+          <CardDescription>
+            {view === 'new' ? 'Preencha as informações do novo serviço.' : 'Altere as informações do serviço.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {renderForm(view === 'edit')}
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold text-gray-900">Catálogo de Serviços</h2>
         
-        <Dialog open={isNewServiceOpen} onOpenChange={setIsNewServiceOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center space-x-2" onClick={resetServiceForm}>
-              <Plus className="w-4 h-4" />
-              <span>Novo Serviço</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Cadastrar Novo Serviço</DialogTitle>
-              <DialogDescription>
-                Preencha as informações do novo serviço que será adicionado ao catálogo.
-              </DialogDescription>
-            </DialogHeader>
-            {renderForm(false)}
-          </DialogContent>
-        </Dialog>
+        <Button className="flex items-center space-x-2" onClick={() => { resetServiceForm(); setView('new'); }}>
+          <Plus className="w-4 h-4" />
+          <span>Novo Serviço</span>
+        </Button>
       </div>
-
-      {/* Modal de Edição */}
-      <Dialog open={isEditServiceOpen} onOpenChange={setIsEditServiceOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Serviço</DialogTitle>
-            <DialogDescription>
-              Altere as informações do serviço e salve as modificações.
-            </DialogDescription>
-          </DialogHeader>
-          {renderForm(true)}
-        </DialogContent>
-      </Dialog>
 
       {/* Services Grid */}
       {loading && services.length === 0 ? (

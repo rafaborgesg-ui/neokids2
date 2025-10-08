@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { supabase } from './utils/supabase/client' // Importar o cliente centralizado
+import React, { useState, useEffect, useRef } from 'react'
+import { supabase } from './utils/supabase/client'
 import { LoginForm } from './components/LoginForm'
 import { Dashboard } from './components/Dashboard'
 import { PatientManagement } from './components/PatientManagement'
@@ -141,55 +141,37 @@ type UserSession = {
 
 const App = () => {
   const [session, setSession] = useState<UserSession | null>(null)
-  const [activeModule, setActiveModule] = useState('dashboard')
   const [loading, setLoading] = useState(true)
+  const [activeModule, setActiveModule] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isMobile = useIsMobile()
+  const mainContentRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    // Check for existing session
-    checkSession()
+    // Define o estado inicial da sessão
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session as UserSession);
+      setLoading(false);
+    });
+
+    // Ouve mudanças no estado de autenticação (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session as UserSession);
+    });
+
+    // Limpa o listener quando o componente é desmontado
+    return () => subscription.unsubscribe();
   }, [])
 
-  const checkSession = async () => {
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession()
-      if (session) {
-        setSession(session as UserSession)
-      }
-    } catch (error) {
-      console.error('Erro ao verificar sessão:', error)
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    if (mainContentRef.current) {
+      mainContentRef.current.scrollTo(0, 0);
     }
-  }
-
-  const handleLogin = async (email: string, password: string) => {
-    try {
-      const { data: { session }, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
-      
-      if (error) {
-        if (error.message === 'Invalid login credentials') {
-          throw new Error('Credenciais inválidas. Verifique se os dados de demonstração foram inicializados.')
-        }
-        throw new Error(error.message)
-      }
-      
-      if (session) {
-        setSession(session as UserSession)
-      }
-    } catch (error) {
-      throw error
-    }
-  }
+  }, [activeModule]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    setSession(null)
-    setActiveModule('dashboard')
+    // onAuthStateChange irá atualizar a sessão para null automaticamente
   }
 
   if (loading) {
@@ -210,7 +192,7 @@ const App = () => {
     return (
       <>
         <DemoInitializer />
-        <LoginForm onLogin={handleLogin} />
+        <LoginForm />
       </>
     )
   }
@@ -226,102 +208,102 @@ const App = () => {
     <ToastProvider>
       <div className="min-h-screen bg-gray-50">
         <NeokidsHead />
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              {/* Mobile menu button */}
-              {isMobile && (
-                <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-                  <SheetTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-gray-500 hover:text-gray-700 md:hidden"
-                      aria-label="Abrir menu de navegação"
-                    >
-                      <Menu className="w-5 h-5" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left" className="p-0 w-72">
-                    <NavigationMenu
-                      modules={availableModules}
-                      activeModule={activeModule}
-                      onModuleChange={setActiveModule}
-                      onClose={() => setSidebarOpen(false)}
-                    />
-                  </SheetContent>
-                </Sheet>
-              )}
-              
-              {/* Logo - hidden on mobile quando o menu está disponível */}
-              {!isMobile && (
-                <NeokidsLogo 
-                  size="lg" 
-                  variant="full" 
-                  showText={true}
-                  className="transition-all duration-200 hover:scale-105"
-                />
-              )}
-              
-              {/* Mobile logo */}
-              {isMobile && (
-                <NeokidsLogo 
-                  size="md" 
-                  variant="full" 
-                  showText={true}
-                  className="transition-all duration-200"
-                />
-              )}
-            </div>
-            
-            <div className="flex items-center space-x-2 md:space-x-4">
-              <div className="flex items-center space-x-2">
-                <User className="w-4 h-4 text-gray-500" />
-                <span className="text-sm text-gray-700 hidden sm:inline">
-                  {session.user.user_metadata?.name || session.user.email}
-                </span>
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                  {currentUserRole}
-                </span>
+        {/* Header */}
+        <header className="bg-white shadow-sm border-b sticky top-0 z-40">
+          <div className="px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex items-center space-x-4">
+                {/* Mobile menu button */}
+                {isMobile && (
+                  <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                    <SheetTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-gray-500 hover:text-gray-700 md:hidden"
+                        aria-label="Abrir menu de navegação"
+                      >
+                        <Menu className="w-5 h-5" />
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="p-0 w-72">
+                      <NavigationMenu
+                        modules={availableModules}
+                        activeModule={activeModule}
+                        onModuleChange={setActiveModule}
+                        onClose={() => setSidebarOpen(false)}
+                      />
+                    </SheetContent>
+                  </Sheet>
+                )}
+                
+                {/* Logo - hidden on mobile quando o menu está disponível */}
+                {!isMobile && (
+                  <NeokidsLogo 
+                    size="lg" 
+                    variant="full" 
+                    showText={true}
+                    className="transition-all duration-200 hover:scale-105"
+                  />
+                )}
+                
+                {/* Mobile logo */}
+                {isMobile && (
+                  <NeokidsLogo 
+                    size="md" 
+                    variant="full" 
+                    showText={true}
+                    className="transition-all duration-200"
+                  />
+                )}
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLogout}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <LogOut className="w-4 h-4" />
-              </Button>
+              
+              <div className="flex items-center space-x-2 md:space-x-4">
+                <div className="flex items-center space-x-2">
+                  <User className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm text-gray-700 hidden sm:inline">
+                    {session.user.user_metadata?.name || session.user.email}
+                  </span>
+                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                    {currentUserRole}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </div>
+        </header>
+
+        <div className="flex">
+          {/* Desktop Sidebar */}
+          {!isMobile && (
+            <aside className="w-64 bg-white shadow-sm min-h-[calc(100vh-4rem)] sticky top-16">
+              <NavigationMenu
+                modules={availableModules}
+                activeModule={activeModule}
+                onModuleChange={setActiveModule}
+              />
+            </aside>
+          )}
+
+          {/* Main Content */}
+          <main ref={mainContentRef} className={`flex-1 p-4 md:p-6 ${isMobile ? 'w-full' : 'overflow-y-auto'}`}>
+            <div className="max-w-full">
+              <ActiveComponent 
+                userRole={currentUserRole}
+                onNavigate={setActiveModule}
+              />
+            </div>
+          </main>
         </div>
-      </header>
-
-      <div className="flex">
-        {/* Desktop Sidebar */}
-        {!isMobile && (
-          <aside className="w-64 bg-white shadow-sm min-h-[calc(100vh-4rem)] sticky top-16">
-            <NavigationMenu
-              modules={availableModules}
-              activeModule={activeModule}
-              onModuleChange={setActiveModule}
-            />
-          </aside>
-        )}
-
-        {/* Main Content */}
-        <main className={`flex-1 p-4 md:p-6 ${isMobile ? 'w-full' : ''}`}>
-          <div className="max-w-full">
-            <ActiveComponent 
-              userRole={currentUserRole}
-              onNavigate={setActiveModule}
-            />
-          </div>
-        </main>
       </div>
-    </div>
     </ToastProvider>
   )
 }

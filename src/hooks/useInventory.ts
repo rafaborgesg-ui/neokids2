@@ -4,16 +4,18 @@ import { PostgrestError } from '@supabase/supabase-js';
 
 export interface InventoryItem {
   id: string;
+  created_at: string;
   name: string;
   description?: string;
   quantity: number;
-  low_stock_threshold: number;
   unit?: string;
-  created_at: string;
-  updated_at?: string;
+  alert_level: number;
+  supplier?: string;
+  last_updated_by?: string;
 }
 
-export type NewInventoryItem = Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>;
+export type NewInventoryItem = Omit<InventoryItem, 'id' | 'created_at' | 'last_updated_by'>;
+export type UpdateInventoryItem = Partial<NewInventoryItem>;
 
 export const useInventory = () => {
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -21,7 +23,7 @@ export const useInventory = () => {
   const [error, setError] = useState<PostgrestError | null>(null);
 
   const handleSupabaseError = (error: PostgrestError) => {
-    console.error('Supabase error:', error);
+    console.error('[DEBUG] Erro retornado pelo Supabase:', error); // Log do erro
     setError(error);
   };
 
@@ -40,9 +42,21 @@ export const useInventory = () => {
 
   const createItem = useCallback(async (itemData: NewInventoryItem) => {
     setLoading(true);
+    console.log('[DEBUG] Hook createItem recebido:', itemData); // Log dos dados recebidos pelo hook
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('[DEBUG] Usuário não autenticado ao tentar criar item.');
+      setLoading(false);
+      return null;
+    }
+
+    const dataToInsert = { ...itemData, last_updated_by: user.id };
+    console.log('[DEBUG] Enviando para o Supabase:', dataToInsert); // Log dos dados a serem inseridos
+
     const { data, error } = await supabase
       .from('inventory_items')
-      .insert([itemData])
+      .insert([dataToInsert])
       .select();
       
     if (error) {
@@ -50,6 +64,7 @@ export const useInventory = () => {
       setLoading(false);
       return null;
     } else {
+      console.log('[DEBUG] Resposta de sucesso do Supabase:', data); // Log da resposta de sucesso
       const newItem = data ? data[0] : null;
       if (newItem) setItems(prev => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));
       setLoading(false);
@@ -57,11 +72,19 @@ export const useInventory = () => {
     }
   }, []);
 
-  const updateItem = useCallback(async (id: string, updates: Partial<InventoryItem>) => {
+  const updateItem = useCallback(async (id: string, updates: UpdateInventoryItem) => {
     setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setLoading(false);
+      return null;
+    }
+
+    const dataToUpdate = { ...updates, last_updated_by: user.id };
+
     const { data, error } = await supabase
       .from('inventory_items')
-      .update(updates)
+      .update(dataToUpdate)
       .eq('id', id)
       .select();
 

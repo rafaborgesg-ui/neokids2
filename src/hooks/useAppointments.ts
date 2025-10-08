@@ -16,9 +16,12 @@ export interface Appointment {
   notes?: string;
   created_at: string;
   created_by: string;
-  // Campos populados a partir de joins
   patients: Patient; // Supabase renomeia a tabela para o singular
-  appointment_services: { services: Service }[]; // Relação de serviços
+  appointment_services: {
+    result_data: any; // Adicionar a nova coluna
+    notes: string; // Adicionar a nova coluna
+    services: Service;
+  }[]; // Relação de serviços
 }
 
 // Tipo para a criação de um novo agendamento
@@ -51,6 +54,8 @@ export const useAppointments = () => {
         *,
         patients (*),
         appointment_services (
+          result_data,
+          notes,
           services (*)
         )
       `)

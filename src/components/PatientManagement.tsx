@@ -4,6 +4,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription, // Importar o componente que faltava
 } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -17,6 +18,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "./ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "./ui/drawer";
 import { Badge } from "./ui/badge";
 import { Alert, AlertDescription } from "./ui/alert";
 import {
@@ -29,7 +38,7 @@ import { useLoadingStates } from "../hooks/useLoadingStates";
 import {
   useFormValidation,
   neokidsValidationRules,
-  ValidationErrors, // Importar o tipo
+  ValidationErrors,
 } from "../hooks/useFormValidation";
 import { cn } from "./ui/utils";
 import {
@@ -47,7 +56,10 @@ import {
   Loader2,
 } from "lucide-react";
 import { usePatients, Patient, NewPatient, UpdatePatient } from "../hooks/usePatients";
+import { PatientHistory } from './PatientHistory';
+import { useIsMobile } from "../hooks/useIsMobile";
 
+// = aprimorada para garantir que o conteúdo seja sempre rolável e ocupe a tela inteira em dispositivos móveis
 // ====================================================================
 // Componentes de Formulário Estáveis (Definições Corrigidas)
 // ====================================================================
@@ -314,7 +326,7 @@ export const PatientManagement = ({
   userRole,
   onNavigate,
 }: PatientManagementProps) => {
-  // Usar o nosso novo hook
+  const [view, setView] = useState<'list' | 'new' | 'edit' | 'history'>('list'); // Estado para controlar a visualização
   const {
     patients,
     loading: patientsLoading,
@@ -328,6 +340,7 @@ export const PatientManagement = ({
   const [isNewPatientOpen, setIsNewPatientOpen] = useState(false);
   const [isEditPatientOpen, setIsEditPatientOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+  const [historyPatient, setHistoryPatient] = useState<Patient | null>(null);
 
   // O hook useLoadingStates pode ser simplificado ou substituído pelo 'patientsLoading'
   const { isLoading, withLoading } = useLoadingStates();
@@ -366,9 +379,9 @@ export const PatientManagement = ({
     }
   }, [isNewPatientOpen, resetForm]);
 
-  // Efeito para preencher o formulário ao abrir o modal de edição
+  // Efeito para preencher o formulário ao abrir o modo de edição
   useEffect(() => {
-    if (editingPatient) {
+    if (view === 'edit' && editingPatient) {
       setValue("name", editingPatient.name);
       setValue("birthDate", editingPatient.birth_date);
       setValue("cpf", editingPatient.cpf);
@@ -380,7 +393,7 @@ export const PatientManagement = ({
       setValue("responsiblePhone", editingPatient.responsible_phone);
       setValue("specialAlert", editingPatient.special_alert || "");
     }
-  }, [editingPatient, setValue]);
+  }, [view, editingPatient, setValue]);
 
   // Efeito de busca refatorado
   useEffect(() => {
@@ -491,13 +504,18 @@ export const PatientManagement = ({
 
   const handleOpenEditModal = (patient: Patient) => {
     setEditingPatient(patient);
-    setIsEditPatientOpen(true);
+    setView('edit');
+  };
+
+  const handleOpenHistoryModal = (patient: Patient) => {
+    setHistoryPatient(patient);
+    setView('history');
   };
 
   const handleCancelForm = () => {
-    setIsNewPatientOpen(false);
-    setIsEditPatientOpen(false);
+    setView('list');
     setEditingPatient(null);
+    setHistoryPatient(null);
     resetForm();
   };
 
@@ -536,68 +554,58 @@ export const PatientManagement = ({
     return phone.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-gray-900">
-          Gestão de Pacientes
-        </h2>
-
-        <Dialog
-          open={isNewPatientOpen}
-          onOpenChange={setIsNewPatientOpen}
-        >
-          <DialogTrigger asChild>
-            <Button className="flex items-center space-x-2">
-              <Plus className="w-4 h-4" />
-              <span>Novo Paciente</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Cadastrar Novo Paciente</DialogTitle>
-              <DialogDescription>
-                Preencha os dados do novo paciente para
-                cadastrá-lo no sistema.
-              </DialogDescription>
-            </DialogHeader>
-            <PatientForm 
-              isEditing={false}
-              values={values}
-              errors={errors}
-              isValid={isValid}
-              patientsLoading={patientsLoading}
-              setValue={setValue}
-              handleBlur={field => handleBlur(field)}
-              onSubmit={handleCreatePatient}
-              onCancel={handleCancelForm}
-            />
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Modal de Edição */}
-      <Dialog open={isEditPatientOpen} onOpenChange={setIsEditPatientOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Paciente</DialogTitle>
-            <DialogDescription>
-              Altere os dados do paciente e salve as modificações.
-            </DialogDescription>
-          </DialogHeader>
+  if (view === 'new' || view === 'edit') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{view === 'new' ? 'Cadastrar Novo Paciente' : 'Editar Paciente'}</CardTitle>
+          <CardDescription>
+            {view === 'new' ? 'Preencha os dados do novo paciente.' : 'Altere os dados do paciente.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
           <PatientForm 
-            isEditing={true}
+            isEditing={view === 'edit'}
             values={values}
             errors={errors}
             isValid={isValid}
             patientsLoading={patientsLoading}
             setValue={setValue}
             handleBlur={field => handleBlur(field)}
-            onSubmit={handleUpdatePatient}
+            onSubmit={view === 'new' ? handleCreatePatient : handleUpdatePatient}
             onCancel={handleCancelForm}
           />
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (view === 'history' && historyPatient) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{`Histórico de ${historyPatient.name}`}</CardTitle>
+          <CardDescription>Lista de todos os atendimentos anteriores do paciente.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PatientHistory patientId={historyPatient.id} patientName={historyPatient.name} />
+          <Button variant="outline" className="mt-4" onClick={handleCancelForm}>Voltar</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold text-gray-900">
+          Gestão de Pacientes
+        </h2>
+        <Button className="flex items-center space-x-2" onClick={() => setView('new')}>
+          <Plus className="w-4 h-4" />
+          <span>Novo Paciente</span>
+        </Button>
+      </div>
 
       {/* Search */}
       <Card>
@@ -729,7 +737,7 @@ export const PatientManagement = ({
                 </div>
 
                 <div className="flex justify-end space-x-2 mt-4">
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={() => handleOpenHistoryModal(patient)}>
                     <Eye className="w-4 h-4 mr-1" />
                     Ver Histórico
                   </Button>

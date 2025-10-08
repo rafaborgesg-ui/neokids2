@@ -3,15 +3,15 @@ import { supabase } from '../utils/supabase/client';
 import { PostgrestError } from '@supabase/supabase-js';
 
 export interface AuditLogEntry {
-  id: number;
+  id: string; // UUID é uma string
   table_name: string;
   record_id: string;
   action: 'INSERT' | 'UPDATE' | 'DELETE';
-  old_data?: any;
-  new_data?: any;
+  old_record_data?: any;
+  new_record_data?: any;
   user_id: string;
   user_email: string;
-  timestamp: string;
+  created_at: string; // Corrigir o nome da coluna
 }
 
 export interface LogFilters {
@@ -41,7 +41,7 @@ export const useAuditLogs = () => {
     let query = supabase
       .from('audit_logs')
       .select('*', { count: 'exact' })
-      .order('timestamp', { ascending: false })
+      .order('created_at', { ascending: false }) // Corrigir o nome da coluna
       .range(from, to);
 
     if (filters.tableName) {

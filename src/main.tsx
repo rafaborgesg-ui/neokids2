@@ -10,7 +10,7 @@ if (typeof crypto !== 'undefined' && typeof crypto.randomUUID !== 'function') {
 }
 
 import { createRoot } from "react-dom/client";
-import App from "./App"; // Remover a extensão .tsx
+import App from "./App";
 import "./index.css";
 
 createRoot(document.getElementById("root")!).render(<App />);

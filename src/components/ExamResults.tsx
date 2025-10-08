@@ -17,6 +17,7 @@ import {
   FileText, 
   Loader2,
   Save,
+  CheckCircle, // Adicionar ícone de sucesso
   FlaskConical
 } from 'lucide-react';
 
@@ -36,6 +37,7 @@ export const ExamResults = ({ userRole, onNavigate }: ExamResultsProps) => {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [editingResults, setEditingResults] = useState<Record<string, any>>({});
+  const [savingStates, setSavingStates] = useState<Record<string, 'saving' | 'saved' | null>>({});
 
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -73,16 +75,30 @@ export const ExamResults = ({ userRole, onNavigate }: ExamResultsProps) => {
     const serviceResult = editingResults[serviceId];
     if (!serviceResult) return;
 
+    setSavingStates(prev => ({ ...prev, [serviceId]: 'saving' }));
+
     const resultData: UpsertExamResult = {
       appointment_id: selectedAppointment.id,
       service_id: serviceId,
       patient_id: selectedPatient.id,
-      result_data: { value: serviceResult.value }, // Estrutura simples, pode ser expandida
+      result_data: { value: serviceResult.value },
       notes: serviceResult.notes,
-      status: 'final', // Marcar como final ao salvar
+      status: 'final',
     };
 
-    await upsertResult(resultData);
+    const saved = await upsertResult(resultData);
+
+    if (saved) {
+      setSavingStates(prev => ({ ...prev, [serviceId]: 'saved' }));
+      // Recarrega os dados do atendimento para refletir o resultado salvo
+      fetchAppointments({ appointmentId: selectedAppointment.id });
+      setTimeout(() => {
+        setSavingStates(prev => ({ ...prev, [serviceId]: null }));
+      }, 2000); // Limpa o status de "salvo" após 2 segundos
+    } else {
+      setSavingStates(prev => ({ ...prev, [serviceId]: null }));
+      // Adicionar toast de erro aqui
+    }
   };
 
   const getResultForService = (serviceId: string): ExamResult | undefined => {
@@ -158,17 +174,22 @@ export const ExamResults = ({ userRole, onNavigate }: ExamResultsProps) => {
               {selectedAppointment && (
                 <div className="space-y-4">
                   {selectedAppointment.appointment_services.map(({ services }) => {
-                    const result = getResultForService(services.id);
+                    // Acessa os dados diretamente da junção, que é mais confiável
+                    const serviceInAppointment = selectedAppointment.appointment_services.find(s => s.services.id === services.id);
+                    const result = serviceInAppointment?.result_data;
+                    const notes = serviceInAppointment?.notes;
+
                     const isEditing = !!editingResults[services.id];
-                    const currentResultValue = isEditing ? editingResults[services.id]?.value : result?.result_data?.value || '';
-                    const currentNotesValue = isEditing ? editingResults[services.id]?.notes : result?.notes || '';
+                    const currentResultValue = isEditing ? editingResults[services.id]?.value : result?.value || '';
+                    const currentNotesValue = isEditing ? editingResults[services.id]?.notes : notes || '';
+                    const savingStatus = savingStates[services.id];
 
                     return (
                       <div key={services.id} className="p-4 border rounded-lg">
                         <div className="flex justify-between items-center">
                           <h3 className="font-semibold text-gray-800">{services.name}</h3>
-                          <Badge variant={result?.status === 'final' ? 'default' : 'outline'}>
-                            {result?.status || 'Pendente'}
+                          <Badge variant={result ? 'default' : 'outline'}>
+                            {result ? 'Finalizado' : 'Pendente'}
                           </Badge>
                         </div>
                         <div className="mt-2 space-y-2">
@@ -190,9 +211,10 @@ export const ExamResults = ({ userRole, onNavigate }: ExamResultsProps) => {
                             />
                           </div>
                           <div className="flex justify-end">
-                            <Button onClick={() => handleSaveResult(services.id)} size="sm">
-                              <Save className="w-4 h-4 mr-2" />
-                              Salvar
+                            <Button onClick={() => handleSaveResult(services.id)} size="sm" disabled={savingStatus === 'saving'}>
+                              {savingStatus === 'saving' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                              {savingStatus === 'saved' && <CheckCircle className="w-4 h-4 mr-2 text-green-500" />}
+                              {savingStatus ? (savingStatus === 'saved' ? 'Salvo!' : 'Salvando...') : 'Salvar'}
                             </Button>
                           </div>
                         </div>

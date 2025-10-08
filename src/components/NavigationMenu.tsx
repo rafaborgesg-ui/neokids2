@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react'
-import { Button } from './ui/button'
-import { cn } from './ui/utils'
-import { NeokidsLogo } from './NeokidsLogo'
-import { IosInstallInstructions } from './IosInstallInstructions'
-import { Download, type LucideIcon } from 'lucide-react' // Importar o tipo LucideIcon
-import { ScrollArea } from './ui/scroll-area'
+import React, { useState, useEffect } from 'react';
+import { Button } from './ui/button';
+import { cn } from './ui/utils';
+import { NeokidsLogo } from './NeokidsLogo';
+import { IosInstallInstructions } from './IosInstallInstructions';
+import { Download, type LucideIcon } from 'lucide-react';
 
 interface Module {
   id: string
@@ -85,34 +84,28 @@ export const NavigationMenu: React.FC<NavigationMenuProps> = ({
         <NeokidsLogo size="lg" variant="full" showText={true} />
       </div>
 
-      {/* Área de Rolagem (ocupa todo o espaço restante) com efeito de fade */}
-      <div className="flex-grow relative">
-        <ScrollArea className="absolute inset-0">
-          <nav className="p-4 space-y-2">
-            {modules.map(module => {
-              const Icon = module.icon
-              const isActive = activeModule === module.id
-              return (
-                <Button
-                  key={module.id}
-                  variant={isActive ? 'secondary' : 'ghost'}
-                  className={cn(
-                    'w-full justify-start',
-                    isActive && 'font-semibold'
-                  )}
-                  onClick={() => handleModuleClick(module.id)}
-                >
-                  <Icon className="w-4 h-4 mr-2" />
-                  {module.name}
-                </Button>
-              )
-            })}
-          </nav>
-        </ScrollArea>
-        {/* Efeito de fade no topo */}
-        <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-white to-transparent pointer-events-none" />
-        {/* Efeito de fade na base */}
-        <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+      {/* Área de Rolagem Nativa (ocupa todo o espaço restante) */}
+      <div className="flex-grow overflow-y-auto">
+        <nav className="p-4 space-y-2">
+          {modules.map(module => {
+            const Icon = module.icon;
+            const isActive = activeModule === module.id;
+            return (
+              <Button
+                key={module.id}
+                variant={isActive ? 'secondary' : 'ghost'}
+                className={cn(
+                  'w-full justify-start',
+                  isActive && 'font-semibold'
+                )}
+                onClick={() => handleModuleClick(module.id)}
+              >
+                <Icon className="w-4 h-4 mr-2" />
+                {module.name}
+              </Button>
+            );
+          })}
+        </nav>
       </div>
 
       {/* Rodapé / Botão de Instalação (não encolhe) */}
@@ -129,10 +122,11 @@ export const NavigationMenu: React.FC<NavigationMenuProps> = ({
         </div>
       )}
 
+      {/* Modal de Instruções para iOS */}
       <IosInstallInstructions
         isOpen={showIosInstructions}
         onClose={() => setShowIosInstructions(false)}
       />
     </div>
-  )
-}
+  );
+};

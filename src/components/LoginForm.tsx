@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Alert, AlertDescription } from './ui/alert'
 import { NeokidsLogo } from './NeokidsLogo'
 import { Loader2 } from 'lucide-react'
+import { supabase } from '../utils/supabase/client'
 
 interface LoginFormProps {
-  onLogin: (email: string, password: string) => Promise<void>
+  onLogin?: (email: string, password: string) => Promise<void>;
 }
 
 export const LoginForm = ({ onLogin }: LoginFormProps) => {
@@ -23,7 +24,12 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
     setError('')
 
     try {
-      await onLogin(email, password)
+      if (onLogin) {
+        await onLogin(email, password)
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
     } catch (err: any) {
       setError(err.message || 'Erro ao fazer login')
     } finally {

@@ -66,10 +66,33 @@ export const useExamResults = () => {
     setLoading(true);
     setError(null);
 
-    const { data, error } = await supabase
-      .from('exam_results')
-      .upsert(resultData, { onConflict: 'appointment_id, service_id' })
-      .select();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setLoading(false);
+      return null;
+    }
+
+    // Dados para ambas as tabelas
+    const dataToUpsert = {
+      ...resultData,
+      created_by: user.id,
+      updated_by: user.id,
+      issued_at: new Date().toISOString(),
+    };
+
+    // Transação: Salva em ambas as tabelas ao mesmo tempo
+    const [, resultUpsert] = await Promise.all([
+      supabase.from('appointment_services').update({
+        result_data: resultData.result_data,
+        notes: resultData.notes,
+      }).match({ appointment_id: resultData.appointment_id, service_id: resultData.service_id }),
+      
+      supabase.from('exam_results')
+        .upsert(dataToUpsert, { onConflict: 'appointment_id, service_id' })
+        .select()
+    ]);
+
+    const { data, error } = resultUpsert;
 
     if (error) {
       handleSupabaseError(error);
@@ -78,9 +101,8 @@ export const useExamResults = () => {
     } else {
       const upsertedResult = data ? data[0] : null;
       if (upsertedResult) {
-        // Atualiza a lista local de resultados
         setResults(prev => {
-          const index = prev.findIndex(r => r.id === upsertedResult.id);
+          const index = prev.findIndex(r => r.appointment_id === upsertedResult.appointment_id && r.service_id === upsertedResult.service_id);
           if (index !== -1) {
             const newResults = [...prev];
             newResults[index] = upsertedResult;

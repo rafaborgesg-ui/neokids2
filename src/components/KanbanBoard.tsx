@@ -2,7 +2,8 @@ import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { useAppointments, Appointment, AppointmentStatus } from '../hooks/useAppointments';
+import { AppointmentStatus } from '../hooks/useAppointments'; // Manter os tipos
+import { useKanban } from '../hooks/useKanban'; // Importar o novo hook
 import { 
   Clock, 
   FlaskConical, 
@@ -38,11 +39,12 @@ const statusColors: Record<AppointmentStatus, string> = {
 };
 
 export const KanbanBoard = ({ userRole, onNavigate }: KanbanBoardProps) => {
-  const { appointments, loading, fetchAppointments, updateAppointmentStatus } = useAppointments();
+  // Usar o novo hook otimizado para o Kanban
+  const { appointments, loading, fetchLabAppointments, updateAppointmentStatus } = useKanban();
 
   useEffect(() => {
-    fetchAppointments(); 
-  }, [fetchAppointments]);
+    fetchLabAppointments(); 
+  }, [fetchLabAppointments]);
 
   const handleStatusChange = (appointmentId: string, newStatus: AppointmentStatus) => {
     updateAppointmentStatus(appointmentId, newStatus);

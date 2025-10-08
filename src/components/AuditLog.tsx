@@ -4,9 +4,50 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { useAuditLogs, AuditLogEntry } from '../hooks/useAuditLogs';
-import { Loader2, Shield, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
+import { Loader2, Shield, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Eye } from 'lucide-react';
 import { format } from 'date-fns';
+
+// Componente para renderizar as diferenças entre dados antigos e novos
+const DataDiff = ({ oldData, newData }: { oldData?: any; newData?: any }) => {
+  if (!oldData && !newData) return <p>Nenhum dado para exibir.</p>;
+
+  const allKeys = new Set([...Object.keys(oldData || {}), ...Object.keys(newData || {})]);
+  const ignoredKeys = ['created_at', 'updated_at']; // Campos que não queremos mostrar
+
+  return (
+    <div className="space-y-2 font-mono text-xs">
+      {Array.from(allKeys).filter(key => !ignoredKeys.includes(key)).map(key => {
+        const oldValue = oldData?.[key];
+        const newValue = newData?.[key];
+        const isChanged = oldValue !== newValue;
+
+        if (!isChanged) {
+          return (
+            <div key={key} className="flex">
+              <span className="w-1/3 text-gray-500 truncate">{key}:</span>
+              <span className="w-2/3 truncate">{JSON.stringify(newValue)}</span>
+            </div>
+          );
+        }
+
+        return (
+          <div key={key}>
+            <div className="flex">
+              <span className="w-1/3 text-gray-500 truncate">{key}:</span>
+              <span className="w-2/3 text-red-600 truncate line-through">{JSON.stringify(oldValue)}</span>
+            </div>
+            <div className="flex">
+              <span className="w-1/3"></span>
+              <span className="w-2/3 text-green-600 truncate">{JSON.stringify(newValue)}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 interface AuditLogProps {
   userRole: string;
@@ -75,17 +116,44 @@ export const AuditLog = ({ userRole, onNavigate }: AuditLogProps) => {
                   <TableHead>Usuário</TableHead>
                   <TableHead>Ação</TableHead>
                   <TableHead>Tabela</TableHead>
-                  <TableHead>Detalhes</TableHead>
+                  <TableHead className="text-right">Detalhes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {logs.map(log => (
                   <TableRow key={log.id}>
-                    <TableCell>{format(new Date(log.timestamp), 'dd/MM/yy HH:mm:ss')}</TableCell>
-                    <TableCell>{log.user_email}</TableCell>
+                    <TableCell>{format(new Date(log.created_at), 'dd/MM/yy HH:mm:ss')}</TableCell>
+                    <TableCell>{log.user_email || 'Sistema'}</TableCell>
                     <TableCell><ActionBadge action={log.action} /></TableCell>
                     <TableCell>{log.table_name}</TableCell>
-                    <TableCell className="text-xs font-mono">ID: {log.record_id.substring(0, 8)}...</TableCell>
+                    <TableCell className="text-right">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Detalhes da Alteração</DialogTitle>
+                          </DialogHeader>
+                          <div className="py-4 space-y-4">
+                            <div>
+                              <h4 className="font-semibold mb-2">Dados Antigos</h4>
+                              <DataDiff oldData={log.old_record_data} newData={null} />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold mb-2">Dados Novos</h4>
+                              <DataDiff oldData={null} newData={log.new_record_data} />
+                            </div>
+                             <div>
+                              <h4 className="font-semibold mb-2">Diferenças</h4>
+                              <DataDiff oldData={log.old_record_data} newData={log.new_record_data} />
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
