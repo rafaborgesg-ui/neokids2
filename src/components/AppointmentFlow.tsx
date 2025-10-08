@@ -37,6 +37,7 @@ export const AppointmentFlow = ({ userRole, onNavigate }: AppointmentFlowProps) 
   const [currentStep, setCurrentStep] = useState(1)
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [patientSearchQuery, setPatientSearchQuery] = useState('')
+  const [serviceSearchQuery, setServiceSearchQuery] = useState(''); // Novo estado para a pesquisa de serviços
   const [selectedServices, setSelectedServices] = useState<Service[]>([])
   const [paymentMethod, setPaymentMethod] = useState('')
   const [insuranceType, setInsuranceType] = useState('particular')
@@ -67,6 +68,12 @@ export const AppointmentFlow = ({ userRole, onNavigate }: AppointmentFlowProps) 
     const total = selectedServices.reduce((sum, service) => sum + service.base_price, 0)
     setTotalAmount(total)
   }, [selectedServices])
+
+  // Filtra os serviços disponíveis com base na pesquisa
+  const filteredServices = services.filter(service =>
+    service.name.toLowerCase().includes(serviceSearchQuery.toLowerCase()) ||
+    service.code.toLowerCase().includes(serviceSearchQuery.toLowerCase())
+  );
 
   const addService = (service: Service) => {
     if (!selectedServices.find(s => s.id === service.id)) {
@@ -275,9 +282,20 @@ export const AppointmentFlow = ({ userRole, onNavigate }: AppointmentFlowProps) 
               <CardTitle>Serviços Disponíveis</CardTitle>
             </CardHeader>
             <CardContent>
+              {/* Campo de Pesquisa de Serviço */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  className="pl-10"
+                  placeholder="Buscar por nome ou código..."
+                  value={serviceSearchQuery}
+                  onChange={(e) => setServiceSearchQuery(e.target.value)}
+                />
+              </div>
+
               {servicesLoading && <Loader2 className="animate-spin mx-auto" />}
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {services.map((service) => (
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {filteredServices.map((service) => (
                   <div
                     key={service.id}
                     className="p-3 border rounded-lg hover:bg-gray-50"

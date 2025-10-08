@@ -5,6 +5,7 @@ import { NeokidsLogo } from './NeokidsLogo';
 import { IosInstallInstructions } from './IosInstallInstructions';
 import { Download, type LucideIcon } from 'lucide-react';
 import { Separator } from './ui/separator';
+import { useToast } from './ui/simple-toast';
 
 interface Module {
   id: string
@@ -26,50 +27,64 @@ export const NavigationMenu: React.FC<NavigationMenuProps> = ({
   onModuleChange,
   onClose,
 }: NavigationMenuProps) => {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
-  const [isIos, setIsIos] = useState(false)
-  const [showIosInstructions, setShowIosInstructions] = useState(false)
-  const [canInstall, setCanInstall] = useState(false)
-  const [isStandalone, setIsStandalone] = useState(false)
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isIos, setIsIos] = useState(false);
+  const [showIosInstructions, setShowIosInstructions] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [canInstall, setCanInstall] = useState(false); // Reintroduzir o estado para controlar a visibilidade no Android
+  const { addToast } = useToast();
 
   useEffect(() => {
-    const runningStandalone = window.matchMedia('(display-mode: standalone)').matches
-    setIsStandalone(runningStandalone)
+    console.log('[DEBUG] Verificando status de instalação...');
+    // Verifica se o app já está rodando em modo standalone (instalado)
+    const runningStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    setIsStandalone(runningStandalone);
 
-    const isDeviceIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
-    setIsIos(isDeviceIos)
-
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault()
-      if (!runningStandalone) {
-        setDeferredPrompt(e)
-        setCanInstall(true)
-      }
+    if (runningStandalone) {
+      console.log('[DEBUG] App já está instalado.');
+      return;
     }
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    // Detecta se é iOS
+    const isDeviceIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIos(isDeviceIos);
+
+    // Ouve o evento de instalação para navegadores que o suportam
+    const handleBeforeInstallPrompt = (e: Event) => {
+      console.log('[DEBUG] Evento "beforeinstallprompt" disparado. App está pronto para instalar.');
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setCanInstall(true); // Sinaliza que a instalação é possível no Android/Desktop
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-    }
-  }, [])
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
 
   const handleInstallClick = () => {
+    // ... (lógica de clique robusta que já implementamos)
     if (isIos) {
-      setShowIosInstructions(true)
-    } else if (deferredPrompt) {
-      deferredPrompt.prompt()
+      setShowIosInstructions(true);
+      return;
+    }
+
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
       deferredPrompt.userChoice.then((choiceResult: any) => {
         if (choiceResult.outcome === 'accepted') {
-          console.log('Usuário instalou o app')
+          addToast({ type: 'success', title: 'Aplicativo instalado com sucesso!' });
+          setIsStandalone(true);
         } else {
-          console.log('Usuário dispensou a instalação')
+          addToast({ type: 'info', title: 'Instalação cancelada.' });
         }
-        setDeferredPrompt(null)
-        setCanInstall(false)
-      })
+      });
+    } else {
+      addToast({ type: 'info', title: 'Instalação manual', description: 'Use a opção "Adicionar à tela inicial" do seu navegador.' });
     }
-  }
+  };
 
   const handleModuleClick = (moduleId: string) => {
     onModuleChange(moduleId)
@@ -107,7 +122,7 @@ export const NavigationMenu: React.FC<NavigationMenuProps> = ({
             );
           })}
 
-          {/* Botão de Instalação DENTRO da área de rolagem */}
+          {/* Botão de Instalação: Aparece se NÃO estiver instalado E (for iOS ou for instalável no Android/Desktop) */}
           {!isStandalone && (isIos || canInstall) && (
             <>
               <Separator className="my-4" />
