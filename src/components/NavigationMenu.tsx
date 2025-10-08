@@ -28,33 +28,26 @@ export const NavigationMenu: React.FC<NavigationMenuProps> = ({
   onClose,
 }: NavigationMenuProps) => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isIos, setIsIos] = useState(false);
+  const [isMobile, setIsMobile] = useState(false); // Apenas este estado é necessário para a visibilidade
   const [showIosInstructions, setShowIosInstructions] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
-  const [canInstall, setCanInstall] = useState(false); // Reintroduzir o estado para controlar a visibilidade no Android
   const { addToast } = useToast();
 
   useEffect(() => {
-    console.log('[DEBUG] Verificando status de instalação...');
     // Verifica se o app já está rodando em modo standalone (instalado)
     const runningStandalone = window.matchMedia('(display-mode: standalone)').matches;
     setIsStandalone(runningStandalone);
 
-    if (runningStandalone) {
-      console.log('[DEBUG] App já está instalado.');
-      return;
-    }
+    if (runningStandalone) return;
 
-    // Detecta se é iOS
-    const isDeviceIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    setIsIos(isDeviceIos);
+    // Detecta se é um dispositivo móvel (iOS ou Android) para controlar a VISIBILIDADE
+    const isMobileDevice = /Android|iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsMobile(isMobileDevice);
 
-    // Ouve o evento de instalação para navegadores que o suportam
+    // Apenas captura o evento para a AÇÃO de clique, não para a visibilidade
     const handleBeforeInstallPrompt = (e: Event) => {
-      console.log('[DEBUG] Evento "beforeinstallprompt" disparado. App está pronto para instalar.');
       e.preventDefault();
       setDeferredPrompt(e);
-      setCanInstall(true); // Sinaliza que a instalação é possível no Android/Desktop
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -65,12 +58,13 @@ export const NavigationMenu: React.FC<NavigationMenuProps> = ({
   }, []);
 
   const handleInstallClick = () => {
-    // ... (lógica de clique robusta que já implementamos)
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     if (isIos) {
       setShowIosInstructions(true);
       return;
     }
 
+    // Lógica para Android e Desktop
     if (deferredPrompt) {
       deferredPrompt.prompt();
       deferredPrompt.userChoice.then((choiceResult: any) => {
@@ -122,8 +116,8 @@ export const NavigationMenu: React.FC<NavigationMenuProps> = ({
             );
           })}
 
-          {/* Botão de Instalação: Aparece se NÃO estiver instalado E (for iOS ou for instalável no Android/Desktop) */}
-          {!isStandalone && (isIos || canInstall) && (
+          {/* Botão de Instalação: Aparece se for um dispositivo móvel e o app não estiver instalado */}
+          {!isStandalone && isMobile && (
             <>
               <Separator className="my-4" />
               <Button
