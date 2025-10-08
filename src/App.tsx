@@ -21,6 +21,7 @@ import { Button } from './components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from './components/ui/sheet'
 import { ToastProvider } from './components/ui/simple-toast'
 import { useIsMobile } from './hooks/useIsMobile'
+import { InstallPwaPrompt } from './components/InstallPwaPrompt'
 import { 
   User, 
   Users, 
@@ -224,6 +225,7 @@ const App = () => {
     <ToastProvider>
       <div className="min-h-screen bg-gray-50">
         <NeokidsHead />
+        <InstallPwaPrompt />
       {/* Header */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-40">
         <div className="px-4 sm:px-6 lg:px-8">
